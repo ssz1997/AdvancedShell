@@ -33,7 +33,7 @@
 
 /* using bool as built-in; char is better in terms of space utilization, but
  * code is not succint */
-typedef enum { false, true } bool;
+//typedef enum { false, true } bool;
 
 /* A process is a single process (a command to run an executable program).  */
 typedef struct process {
@@ -46,7 +46,7 @@ typedef struct process {
         int status;                 /* reported status value from job control; 0 on success and nonzero otherwise */
         char *ifile;                /* stores input file name when < is issued */
         char *ofile;                /* stores output file name when > is issued */
-}  process_t;
+} process_t;
 
 /* A job is a process itself or a pipeline of processes.
  * Each job has exactly one process group (pgid) containing all the processes in the job. 
