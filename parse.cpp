@@ -1,6 +1,19 @@
 #include "dsh.h"
 
-int isspace(int c); //check whether the char c is a space
+job_t *find_last_job(job_t *first_job) {
+    job_t *j = first_job;
+    if(!j) return NULL;
+    while(j->next != NULL)
+        j = j->next;
+    return j;
+}
+
+int isspace(int c) {
+    if (c == ' ') {
+        return 1;
+    }
+    return 0;
+} //check whether the char c is a space
 
 /* Initialize the members of job structure */
 bool init_job(job_t *j) 
@@ -177,117 +190,129 @@ job_t* readcmdline(char *msg)
 			switch (cmdline[cmdline_pos]) {
 
 			    case '<': /* input redirection */
-				current_process->ifile = (char *) calloc(MAX_LEN_FILENAME, sizeof(char));
-				if(!current_process->ifile) {
-					fprintf(stderr, "%s\n","malloc: no space");
-					delete_job(current_job,first_job);
-					return NULL;
-                		}
-				++cmdline_pos;
-				while (isspace(cmdline[cmdline_pos])){++cmdline_pos;} /* ignore any spaces */
-				iofile_seek = 0;
-				while(cmdline[cmdline_pos] != '\0' && !isspace(cmdline[cmdline_pos])){
-					if(MAX_LEN_FILENAME == iofile_seek) {
-	                    			fprintf(stderr, "%s\n","malloc: no space");
-			            		delete_job(current_job,first_job);
-                        			return NULL;
-                    			}
-					current_process->ifile[iofile_seek++] = cmdline[cmdline_pos++];
-				}
-				current_process->ifile[iofile_seek] = '\0';
-				current_job->mystdin = INPUT_FD;
-				while(isspace(cmdline[cmdline_pos])) {
-					if(cmdline[cmdline_pos] == '\n')
-						break;
-					++cmdline_pos;
-				}
-				valid_input = false;
-				break;
+                {
+                    current_process->ifile = (char *) calloc(MAX_LEN_FILENAME, sizeof(char));
+                    if (!current_process->ifile) {
+                        fprintf(stderr, "%s\n", "malloc: no space");
+                        delete_job(current_job, first_job);
+                        return NULL;
+                    }
+                    ++cmdline_pos;
+                    while (isspace(cmdline[cmdline_pos])) { ++cmdline_pos; } /* ignore any spaces */
+                    iofile_seek = 0;
+                    while (cmdline[cmdline_pos] != '\0' && !isspace(cmdline[cmdline_pos])) {
+                        if (MAX_LEN_FILENAME == iofile_seek) {
+                            fprintf(stderr, "%s\n", "malloc: no space");
+                            delete_job(current_job, first_job);
+                            return NULL;
+                        }
+                        current_process->ifile[iofile_seek++] = cmdline[cmdline_pos++];
+                    }
+                    current_process->ifile[iofile_seek] = '\0';
+                    current_job->mystdin = INPUT_FD;
+                    while (isspace(cmdline[cmdline_pos])) {
+                        if (cmdline[cmdline_pos] == '\n')
+                            break;
+                        ++cmdline_pos;
+                    }
+                    valid_input = false;
+                    break;
+                }
 			
 			    case '>': /* output redirection */
-				current_process->ofile = (char *) calloc(MAX_LEN_FILENAME, sizeof(char));
-				if(!current_process->ofile) {
-	                		fprintf(stderr, "%s\n","malloc: no space");
-			        	delete_job(current_job,first_job);
-                    			return NULL;
-                		}
-				++cmdline_pos;
-				while (isspace(cmdline[cmdline_pos])){++cmdline_pos;} /* ignore any spaces */
-				iofile_seek = 0;
-				while(cmdline[cmdline_pos] != '\0' && !isspace(cmdline[cmdline_pos])){
-					if(MAX_LEN_FILENAME == iofile_seek) {
-	                    			fprintf(stderr, "%s\n","malloc: no space");
-			            		delete_job(current_job,first_job);
-                        			return NULL;
-                    			}
-					current_process->ofile[iofile_seek++] = cmdline[cmdline_pos++];
-				}
-				current_process->ofile[iofile_seek] = '\0';
-				current_job->mystdout = OUTPUT_FD;
-				while(isspace(cmdline[cmdline_pos])) {
-					if(cmdline[cmdline_pos] == '\n')
-						break;
-					++cmdline_pos;
-				}
-				valid_input = false;
-				break;
+                {
+                    current_process->ofile = (char *) calloc(MAX_LEN_FILENAME, sizeof(char));
+                    if (!current_process->ofile) {
+                        fprintf(stderr, "%s\n", "malloc: no space");
+                        delete_job(current_job, first_job);
+                        return NULL;
+                    }
+                    ++cmdline_pos;
+                    while (isspace(cmdline[cmdline_pos])) { ++cmdline_pos; } /* ignore any spaces */
+                    iofile_seek = 0;
+                    while (cmdline[cmdline_pos] != '\0' && !isspace(cmdline[cmdline_pos])) {
+                        if (MAX_LEN_FILENAME == iofile_seek) {
+                            fprintf(stderr, "%s\n", "malloc: no space");
+                            delete_job(current_job, first_job);
+                            return NULL;
+                        }
+                        current_process->ofile[iofile_seek++] = cmdline[cmdline_pos++];
+                    }
+                    current_process->ofile[iofile_seek] = '\0';
+                    current_job->mystdout = OUTPUT_FD;
+                    while (isspace(cmdline[cmdline_pos])) {
+                        if (cmdline[cmdline_pos] == '\n')
+                            break;
+                        ++cmdline_pos;
+                    }
+                    valid_input = false;
+                    break;
+                }
 
 			   case '|': /* pipeline */
-				cmd[cmd_pos] = '\0';
-				process_t *newprocess = (process_t *)malloc(sizeof(process_t));
-				if(!newprocess) {
-	                		fprintf(stderr, "%s\n","malloc: no space");
-			        	delete_job(current_job,first_job);
-                    			return NULL;
-                		}
-				if(!init_process(newprocess)) {
-					fprintf(stderr, "%s\n","init_process: failed");
-					delete_job(current_job,first_job);
-				    	return NULL;
-                		}
-				if(!readprocessinfo(current_process, cmd)) {
-					fprintf(stderr, "%s\n","parse cmd: error");
-					delete_job(current_job,first_job);
-			    		return NULL;
-				}
-				current_process->next = newprocess;
-				current_process = current_process->next;
-				++cmdline_pos;
-				cmd_pos = 0; /*Reinitialze for new cmd */
-				valid_input = true;	
-				break;
-
+               {
+                   cmd[cmd_pos] = '\0';
+                   process_t *newprocess = (process_t *) malloc(sizeof(process_t));
+                   if (!newprocess) {
+                       fprintf(stderr, "%s\n", "malloc: no space");
+                       delete_job(current_job, first_job);
+                       return NULL;
+                   }
+                   if (!init_process(newprocess)) {
+                       fprintf(stderr, "%s\n", "init_process: failed");
+                       delete_job(current_job, first_job);
+                       return NULL;
+                   }
+                   if (!readprocessinfo(current_process, cmd)) {
+                       fprintf(stderr, "%s\n", "parse cmd: error");
+                       delete_job(current_job, first_job);
+                       return NULL;
+                   }
+                   current_process->next = newprocess;
+                   current_process = current_process->next;
+                   ++cmdline_pos;
+                   cmd_pos = 0; /*Reinitialze for new cmd */
+                   valid_input = true;
+                   break;
+               }
 			   case '&': /* background job */
-				current_job->bg = true;
-				while (isspace(cmdline[cmdline_pos])){++cmdline_pos;} /* ignore any spaces */
-				if(cmdline[cmdline_pos+1] != '\n' && cmdline[cmdline_pos+1] != '\0')
-					fprintf(stderr, "reading bg: extra input ignored");
-				end_of_input = true;
-				break;
+               {
+                   current_job->bg = true;
+                   while (isspace(cmdline[cmdline_pos])) { ++cmdline_pos; } /* ignore any spaces */
+                   if (cmdline[cmdline_pos + 1] != '\n' && cmdline[cmdline_pos + 1] != '\0')
+                       fprintf(stderr, "reading bg: extra input ignored");
+                   end_of_input = true;
+                   break;
+               }
 
 			   case ';': /* sequence of jobs*/
-				sequence = true;
-				strncpy(current_job->commandinfo,cmdline+seq_pos,cmdline_pos-seq_pos);
-				seq_pos = cmdline_pos + 1;
-				break;	
+               {
+                   sequence = true;
+                   strncpy(current_job->commandinfo, cmdline + seq_pos, cmdline_pos - seq_pos);
+                   seq_pos = cmdline_pos + 1;
+                   break;
+               }
 
 			   case '#': /* comment */
-				end_of_input = true;
-				break;
+               {
+                   end_of_input = true;
+                   break;
+               }
 
-			   default:
-				if(!valid_input) {
-					fprintf(stderr, "%s\n", "reading cmdline: could not fathom input");
-			        	delete_job(current_job,first_job);
-                    			return NULL;
-                		}
-				if(cmd_pos == MAX_LEN_CMDLINE-1) {
-					fprintf(stderr,"%s\n","reading cmdline: length exceeds the max limit");
-			        	delete_job(current_job,first_job);
-                    			return NULL;
-                		}
-				cmd[cmd_pos++] = cmdline[cmdline_pos++];
-				break;
+			   default: {
+                   if (!valid_input) {
+                       fprintf(stderr, "%s\n", "reading cmdline: could not fathom input");
+                       delete_job(current_job, first_job);
+                       return NULL;
+                   }
+                   if (cmd_pos == MAX_LEN_CMDLINE - 1) {
+                       fprintf(stderr, "%s\n", "reading cmdline: length exceeds the max limit");
+                       delete_job(current_job, first_job);
+                       return NULL;
+                   }
+                   cmd[cmd_pos++] = cmdline[cmdline_pos++];
+                   break;
+               }
 			}
 			if(end_of_input || sequence)
 				break;

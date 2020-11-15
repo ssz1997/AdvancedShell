@@ -200,8 +200,8 @@ void print_jobs(){
 //    remove_zombies();
     job_t *j = job_list;
     if (j == NULL) {
-        char *msg = "No jobs are running\n";
-        write(STDOUT_FILENO, msg, strlen(msg));
+//        char *msg = "No jobs are running\n";
+//        write(STDOUT_FILENO, msg, strlen(msg));
         return;
     }
     while(j!=NULL){

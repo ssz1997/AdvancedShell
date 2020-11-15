@@ -27,13 +27,13 @@ bool job_is_completed(job_t *j)
 }
 
 /* Find the last job.  */
-job_t *find_last_job(job_t *first_job) {
-    job_t *j = first_job;
-    if(!j) return NULL;
-    while(j->next != NULL)
-        j = j->next;
-    return j;
-}
+//job_t *find_last_job(job_t *first_job) {
+//    job_t *j = first_job;
+//    if(!j) return NULL;
+//    while(j->next != NULL)
+//        j = j->next;
+//    return j;
+//}
 
 /* Find the job for which the pgid is still -1 (indicates not processed) */
 job_t *detach_job(job_t *first_job) 
