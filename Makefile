@@ -1,6 +1,6 @@
 #You can use either a gcc or g++ compiler
-#CC = g++
-CC = gcc
+CC = g++
+# CC = gcc
 EXECUTABLES = dsh
 CFLAGS = -I. -Wall
 PTFLAG = -O2
@@ -21,8 +21,8 @@ debug: $(EXECUTABLES)
         	gdb ./$$dbg ; \
 	done
 
-dsh: dsh.c parse.c helper.c dsh.h
-	$(CC) $(CFLAGS) -o dsh dsh.c parse.c helper.c
+dsh: dsh.cpp parse.cpp helper.cpp dsh.h
+	$(CC) $(CFLAGS) -o dsh dsh.cpp parse.cpp helper.cpp
 
 #dsh: dsh.c dsh.h
 #	$(CC) $(CFLAGS) -o dsh dsh.c
