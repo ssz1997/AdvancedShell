@@ -405,6 +405,21 @@ int main()
             continue; /* NOOP; user entered return or spaces with return */
         }
 
+        if (strcmp(j->commandinfo, "shell") == 0) {
+            while (1) {
+                char *cmdline = (char *)calloc(MAX_LEN_CMDLINE, sizeof(char));
+                fprintf(stdout, ">>> ");
+                fgets(cmdline, MAX_LEN_CMDLINE, stdin);
+                if (strcmp(cmdline, "exit\n") == 0) {
+                    break;
+                }
+                free(cmdline);
+            }
+            free(j->commandinfo);
+            free(j);
+            continue;
+        }
+
         /* Only for debugging purposes to show parser output; turn off in the
          * final code */
 //        if(PRINT_INFO) print_job(j);
