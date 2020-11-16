@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 static char prompt_head[20];
@@ -31,6 +32,10 @@ void parent_wait(job_t *j, int fg);                       // parent wait for chi
 void print_jobs();                                        // print jobs in the list
 bool builtin_cmd(job_t *last_job, int argc, char **argv); // execute built-in cmd
 void spawn_job(job_t *j, bool fg);                        // spawn a new job
+
+void print(string cmdline);
+void assignment(string cmdline);
+int *getForLoop(string cmdline);
 
 job_t *search_job(int jid)
 {
@@ -501,9 +506,40 @@ void print(string cmdline)
         {
             cout << strVariables[content] << endl;
         }
-    } else {
+    }
+    else
+    {
         cout << content << endl;
     }
+}
+
+int *getForLoop(string cmdline)
+{
+    // cout << cmdline << endl;
+    int *arr = new int[3];
+    arr[2] = 1;
+
+    string range = cmdline.substr(cmdline.find("{"));
+    size_t comma = std::count(range.begin(), range.end(), '.');
+    // cout << comma << endl;
+    // cout << range << endl;
+
+    if (comma == 2)
+    {
+        arr[0] = stoi(range.substr(1, range.find(".") - 1));
+        int tmp = range.find(".") + 2;
+        arr[1] = stoi(range.substr(tmp, range.find("}") - tmp));
+    }
+    else
+    {
+        arr[0] = stoi(range.substr(1, range.find(".") - 1));
+        range = range.substr(range.find(".") + 2);
+        arr[1] = stoi(range.substr(0, range.find(".")));
+        range = range.substr(range.find(".") + 2);
+        arr[2] = stoi(range.substr(0, range.find("}")));
+    }
+    // cout << arr[0] << arr[1] << endl;
+    return arr;
 }
 
 int main()
@@ -548,36 +584,48 @@ int main()
                 else if (cmdline.substr(0, 3).compare("for") == 0)
                 {
                     string var = cmdline.substr(cmdline.find(" ") + 1);
-                    var = var.substr(0, cmdline.find(" "));
-                    string range = cmdline.substr(cmdline.find("{"));
-                    size_t comma = std::count(range.begin(), range.end(), '.');
-                    // cout << comma << endl;
-                    // cout << range << endl;
-                    int start = 0;
-                    int end = 0;
-                    int step = 1;
+                    // cout << "var: " << var << endl;
+                    var = var.substr(0, var.find(" "));
+                    // cout << "var: " << var << endl;
+                    int *forinfo = getForLoop(cmdline);
 
-                    if (comma == 2)
+                                        int start = forinfo[0];
+                    int end = forinfo[1];
+                    int step = forinfo[2];
+                    delete forinfo;
+                    intVariables[var] = start;
+
+                    string forcommand;
+                    vector<string> commands;
+                    while (getline(cin, forcommand))
                     {
-                        start = stoi(range.substr(1, range.find(".") - 1));
-                        int tmp = range.find(".") + 2;
-                        end = stoi(range.substr(tmp, range.find("}") - tmp));
+                        forcommand = forcommand.substr(forcommand.find_first_not_of(" \t"));
+                        if (forcommand == "done")
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            commands.push_back(forcommand);
+                        }
                     }
-                    else
+                    for (intVariables[var] = start; intVariables[var] <= end; intVariables[var] += step)
                     {
-                        start = stoi(range.substr(1, range.find(".") - 1));
-                        range = range.substr(range.find(".") + 2);
-                        end = stoi(range.substr(0, range.find(".")));
-                        range = range.substr(range.find(".") + 2);
-                        step = stoi(range.substr(0, range.find("}")));
+                        for (int i = 1; i < commands.size(); i++)
+                        {
+                            string tcmd = commands[i];
+                            if (tcmd.substr(0, 5).compare("echo ") == 0)
+                            {
+                                print(tcmd);
+                            }
+                            else if (tcmd.find("=") != string::npos)
+                            {
+                                assignment(tcmd);
+                            }
+                        }
                     }
 
-                    
-
-
-                    // cout << start << endl;
-                    // cout << end << endl;
-                    // cout << step << endl;
+                    // use for loop to exe every command
                 }
 
                 // unordered_map<string, int> intVariables;
