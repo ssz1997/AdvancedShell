@@ -1,33 +1,43 @@
 #include "dsh.h"
-#include <time.h>
 #include <stdarg.h>
+#include <unordered_map>
+#include <string>
+#include <iostream>
+#include <sstream>
+#include <algorithm>
 
+using namespace std;
 static char prompt_head[20];
 
-job_t *job_list = NULL;  // first job
+unordered_map<string, int> intVariables;
+unordered_map<string, string> strVariables;
+
+job_t *job_list = NULL; // first job
 
 static const int PIPE_READ = 0;
 static const int PIPE_WRITE = 1;
 
 // helper functions
-job_t *search_job (int jid);
-job_t *search_job_pos (int pos);
-void addJob(job_t *j);                              // add job to job list
-process_t* getProcess(int pid);                     // get the process by process id
-void redirect(process_t* p);                        // redirect the input/output
-int set_pgid(job_t *j, process_t *p);               // set pgid for a job
-void new_child(job_t *j, process_t *p, bool fg);     // create context for new child process
-void continue_job(job_t *j);                                 // continue a stopped job
-char* promptmsg();                                          // heading
-void parent_wait (job_t *j, int fg);                        // parent wait for child to finish
-void print_jobs();                                          // print jobs in the list
-bool builtin_cmd(job_t *last_job, int argc, char **argv);   // execute built-in cmd
-void spawn_job(job_t *j, bool fg);                          // spawn a new job
+job_t *search_job(int jid);
+job_t *search_job_pos(int pos);
+void addJob(job_t *j);                                    // add job to job list
+process_t *getProcess(int pid);                           // get the process by process id
+void redirect(process_t *p);                              // redirect the input/output
+int set_pgid(job_t *j, process_t *p);                     // set pgid for a job
+void new_child(job_t *j, process_t *p, bool fg);          // create context for new child process
+void continue_job(job_t *j);                              // continue a stopped job
+char *promptmsg();                                        // heading
+void parent_wait(job_t *j, int fg);                       // parent wait for child to finish
+void print_jobs();                                        // print jobs in the list
+bool builtin_cmd(job_t *last_job, int argc, char **argv); // execute built-in cmd
+void spawn_job(job_t *j, bool fg);                        // spawn a new job
 
-job_t *search_job (int jid) {
+job_t *search_job(int jid)
+{
     DEBUG("search_job");
     job_t *job = job_list;
-    while (job != NULL) {
+    while (job != NULL)
+    {
         if (job->pgid == jid)
             return job;
         job = job->next;
@@ -35,15 +45,19 @@ job_t *search_job (int jid) {
     return NULL;
 }
 
-job_t *search_job_pos (int pos){
+job_t *search_job_pos(int pos)
+{
     DEBUG("search_job_pos");
     job_t *job = job_list;
     int count = pos;
-    while (job != NULL) {
-        if(count == 1){
+    while (job != NULL)
+    {
+        if (count == 1)
+        {
             return job;
         }
-        if(job->next == NULL){
+        if (job->next == NULL)
+        {
             return job;
         }
         count--;
@@ -52,13 +66,19 @@ job_t *search_job_pos (int pos){
     return NULL;
 }
 
-void addJob(job_t *j){
-    if (j){
-        if (job_list == NULL) {
+void addJob(job_t *j)
+{
+    if (j)
+    {
+        if (job_list == NULL)
+        {
             job_list = j;
-        } else {
-            job_t * cur = job_list;
-            while (cur->next != NULL) {
+        }
+        else
+        {
+            job_t *cur = job_list;
+            while (cur->next != NULL)
+            {
                 cur = cur->next;
             }
             cur->next = j;
@@ -66,12 +86,16 @@ void addJob(job_t *j){
     }
 }
 
-process_t* getProcess(int pid) {
-    job_t* cur = job_list;
-    while (cur) {
-        process_t* p = cur->first_process;
-        while (p) {
-            if (p->pid == pid) {
+process_t *getProcess(int pid)
+{
+    job_t *cur = job_list;
+    while (cur)
+    {
+        process_t *p = cur->first_process;
+        while (p)
+        {
+            if (p->pid == pid)
+            {
                 return p;
             }
             p = p->next;
@@ -81,27 +105,33 @@ process_t* getProcess(int pid) {
     return NULL;
 }
 
-void redirect(process_t* p) {
-    if (p->ifile) {
+void redirect(process_t *p)
+{
+    if (p->ifile)
+    {
         int fd = open(p->ifile, O_RDONLY);
-        if (fd >= 0) {
+        if (fd >= 0)
+        {
             dup2(fd, STDIN_FILENO);
             close(fd);
         }
     }
 
-    if (p->ofile) {
+    if (p->ofile)
+    {
         int fd = creat(p->ofile, 0644);
-        if (fd >= 0) {
+        if (fd >= 0)
+        {
             dup2(fd, STDOUT_FILENO);
             close(fd);
         }
     }
 }
 
-int set_pgid(job_t *j, process_t *p) {
+int set_pgid(job_t *j, process_t *p)
+{
     j->pgid = j->pgid < 0 ? p->pid : j->pgid;
-    return setpgid(p->pid,j->pgid);
+    return setpgid(p->pid, j->pgid);
 }
 
 void new_child(job_t *j, process_t *p, bool fg)
@@ -121,56 +151,68 @@ void new_child(job_t *j, process_t *p, bool fg)
     /* also establish child process group in child to avoid race (if parent has not done it yet). */
     set_pgid(j, p);
 
-    if (fg) // if fg is set
+    if (fg)                 // if fg is set
         seize_tty(j->pgid); // assign the terminal
 
     /* Set the handling for job control signals back to the default. */
     signal(SIGINT, SIG_DFL);
 }
 
-void continue_job(job_t *j) {
-    process_t *main_process = getProcess(j -> pgid);
+void continue_job(job_t *j)
+{
+    process_t *main_process = getProcess(j->pgid);
     process_t *p = main_process;
-    while (p) {
+    while (p)
+    {
         p->stopped = false;
         p = p->next;
     }
 
-    if (kill(-j->pgid, SIGCONT) < 0) {
+    if (kill(-j->pgid, SIGCONT) < 0)
+    {
         printf("Kill SIGCONT");
     }
-    if (isatty(STDIN_FILENO)) {
+    if (isatty(STDIN_FILENO))
+    {
         seize_tty(getpid());
     }
 }
 
-char* promptmsg()
+char *promptmsg()
 {
     /* Modify this to include pid */
-    sprintf(prompt_head, "dsh-%d$ ", (int) getpid());
+    sprintf(prompt_head, "dsh-%d$ ", (int)getpid());
     return prompt_head;
 }
 
-void parent_wait (job_t *j, int fg) {
+void parent_wait(job_t *j, int fg)
+{
     DEBUG("parent_wait");
-    if (fg) {
+    if (fg)
+    {
         int status, pid;
-        while((pid = waitpid(WAIT_ANY, &status, WUNTRACED)) > 0){
+        while ((pid = waitpid(WAIT_ANY, &status, WUNTRACED)) > 0)
+        {
             process_t *p = getProcess(pid);
-            if (WIFEXITED(status)){
+            if (WIFEXITED(status))
+            {
                 p->completed = true;
-                if (status == EXIT_SUCCESS) {
+                if (status == EXIT_SUCCESS)
+                {
                     printf("%d (Completed): %s\n", pid, p->argv[0]);
                 }
-                else {
+                else
+                {
                     printf("%d (Failed): %s\n", pid, p->argv[0]);
                 }
                 fflush(stdout);
             }
-            else if (WIFSTOPPED(status)) {
+            else if (WIFSTOPPED(status))
+            {
                 DEBUG("Process %d stopped", p->pid);
-                if (kill (-j->pgid, SIGSTOP) < 0) {
-//                    logger(STDERR_FILENO,"Kill (SIGSTOP) failed.");
+                if (kill(-j->pgid, SIGSTOP) < 0)
+                {
+                    //                    logger(STDERR_FILENO,"Kill (SIGSTOP) failed.");
                     printf("Kill SIGSTOP failed");
                 }
                 p->stopped = true;
@@ -179,15 +221,18 @@ void parent_wait (job_t *j, int fg) {
                 print_jobs();
             }
 
-            else if (WIFCONTINUED(status)) {
+            else if (WIFCONTINUED(status))
+            {
                 DEBUG("Process %d resumed", p->pid);
                 p->stopped = 0;
             }
-            else if (WIFSIGNALED(status)) {
+            else if (WIFSIGNALED(status))
+            {
                 DEBUG("Process %d terminated", p->pid);
                 p->completed = 1;
             }
-            if (job_is_stopped(j) && isatty(STDIN_FILENO)) {
+            if (job_is_stopped(j) && isatty(STDIN_FILENO))
+            {
                 seize_tty(getpid());
                 break;
             }
@@ -195,21 +240,25 @@ void parent_wait (job_t *j, int fg) {
     }
 }
 
-void print_jobs(){
+void print_jobs()
+{
     int count = 1;
-//    remove_zombies();
+    //    remove_zombies();
     job_t *j = job_list;
-    if (j == NULL) {
-//        char *msg = "No jobs are running\n";
-//        write(STDOUT_FILENO, msg, strlen(msg));
+    if (j == NULL)
+    {
+        //        char *msg = "No jobs are running\n";
+        //        write(STDOUT_FILENO, msg, strlen(msg));
         return;
     }
-    while(j!=NULL){
+    while (j != NULL)
+    {
         printf("[%d]", count);
-        if(j->notified)
+        if (j->notified)
             printf("    Stopped     ");
-        else {
-            if(j->bg)
+        else
+        {
+            if (j->bg)
                 printf(" bg ");
             else
                 printf(" fg ");
@@ -222,46 +271,55 @@ void print_jobs(){
     fflush(stdout);
 }
 
-bool builtin_cmd(job_t *last_job, int argc, char **argv){
+bool builtin_cmd(job_t *last_job, int argc, char **argv)
+{
 
     /* check whether the cmd is a built in command
      */
     DEBUG("builtin_cmd");
 
-    if (!strcmp(argv[0], "quit")) {
+    if (!strcmp(argv[0], "quit"))
+    {
         exit(EXIT_SUCCESS);
     }
-    else if (!strcmp("jobs", argv[0])) {
+    else if (!strcmp("jobs", argv[0]))
+    {
         print_jobs();
         return true;
     }
-    else if (!strcmp("cd", argv[0])) {
-        if(argc <= 1 || chdir(argv[1]) == -1) {
-//            logger(STDERR_FILENO,"Error: invalid arguments for directory change");
+    else if (!strcmp("cd", argv[0]))
+    {
+        if (argc <= 1 || chdir(argv[1]) == -1)
+        {
+            //            logger(STDERR_FILENO,"Error: invalid arguments for directory change");
         }
         return true;
     }
 
-        //Background command, works as long as next argument is a reasonable id
-    else if (!strcmp("bg", argv[0])) {
+    //Background command, works as long as next argument is a reasonable id
+    else if (!strcmp("bg", argv[0]))
+    {
         int position = 0;
         job_t *job;
-        if(argc != 2 || !(position = atoi(argv[1]))) {
+        if (argc != 2 || !(position = atoi(argv[1])))
+        {
             printf("%d %d", position, argc);
-//            logger(STDERR_FILENO,"Error: invalid arguments for bg command");
+            //            logger(STDERR_FILENO,"Error: invalid arguments for bg command");
             return true;
         }
-        if (!(job = search_job_pos(position))) {
+        if (!(job = search_job_pos(position)))
+        {
             printf("%d %d", position, argc);
-//            logger(STDERR_FILENO, "Error: Could not find requested job");
+            //            logger(STDERR_FILENO, "Error: Could not find requested job");
             return true;
         }
-        if(job_is_completed(job)) {
-//            logger(STDERR_FILENO, "Error: job is already completed!");
+        if (job_is_completed(job))
+        {
+            //            logger(STDERR_FILENO, "Error: job is already completed!");
             return true;
         }
 
-        printf("#Sending job '%s' to background\n", job -> commandinfo);
+        printf("#Sending job '%s' to background\n", job->commandinfo);
         fflush(stdout);
         continue_job(job);
         job->bg = true;
@@ -269,47 +327,53 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv){
         return true;
     }
 
-        //Foreground command, works as long as next argument is a reasonable id
-    else if (!strcmp("fg", argv[0])) {
+    //Foreground command, works as long as next argument is a reasonable id
+    else if (!strcmp("fg", argv[0]))
+    {
         int pos = 0;
         job_t *job;
 
         //no arguments specified, use last job
-        if (argc == 1) {
+        if (argc == 1)
+        {
             job = search_job_pos(-1);
         }
-            //right arguments given, find respective job
-        else if (argc == 2 && (pos = atoi(argv[1]))) {
-            if (!(job = search_job_pos(pos))) {
-//                logger(STDERR_FILENO, "Could not find requested job");
+        //right arguments given, find respective job
+        else if (argc == 2 && (pos = atoi(argv[1])))
+        {
+            if (!(job = search_job_pos(pos)))
+            {
+                //                logger(STDERR_FILENO, "Could not find requested job");
                 return true;
             }
-            if (job -> notified == false) {
-//                logger(STDERR_FILENO, "The job is already in foreground.");
+            if (job->notified == false)
+            {
+                //                logger(STDERR_FILENO, "The job is already in foreground.");
                 return true;
             }
-            if(job_is_completed(job)) {
-//                logger(STDERR_FILENO,"Job already completed!");
+            if (job_is_completed(job))
+            {
+                //                logger(STDERR_FILENO,"Job already completed!");
                 return true;
             }
         }
-        else {
-//            logger(STDERR_FILENO,"Invalid arguments for fg command");
+        else
+        {
+            //            logger(STDERR_FILENO,"Invalid arguments for fg command");
             return true;
         }
 
-        printf("#Bringing job '%s' to foreground\n", job -> commandinfo);
+        printf("#Bringing job '%s' to foreground\n", job->commandinfo);
         fflush(stdout);
         continue_job(job);
-        job -> bg = false;
+        job->bg = false;
         if (isatty(STDIN_FILENO))
             seize_tty(job->pgid);
         parent_wait(job, true);
         return true;
     }
-    return false;       /* not a builtin command */
+    return false; /* not a builtin command */
 }
-
 
 void spawn_job(job_t *j, bool fg)
 {
@@ -319,11 +383,12 @@ void spawn_job(job_t *j, bool fg)
     addJob(j);
     int prev_pipe[2];
 
-
-    for(p = j->first_process; p; p = p->next) {
+    for (p = j->first_process; p; p = p->next)
+    {
 
         /* YOUR CODE HERE? */
-        if(p->argv[0] == NULL){
+        if (p->argv[0] == NULL)
+        {
             continue;
         }
         int next_pipe[2];
@@ -331,55 +396,61 @@ void spawn_job(job_t *j, bool fg)
         pipe(next_pipe);
 
         /* Builtin commands are already taken care earlier */
-        switch (pid = fork()) {
+        switch (pid = fork())
+        {
 
-            case -1: /* fork failure */
-                perror("fork");
+        case -1: /* fork failure */
+            perror("fork");
+            exit(EXIT_FAILURE);
+
+        case 0: /* child process  */
+            p->pid = getpid();
+
+            set_pgid(j, p);
+
+            if (p != j->first_process)
+            {
+                close(prev_pipe[PIPE_WRITE]);
+                dup2(prev_pipe[PIPE_READ], STDIN_FILENO);
+                close(prev_pipe[PIPE_READ]);
+            }
+            if (p->next)
+            {
+                close(next_pipe[PIPE_READ]);
+                dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
+                close(next_pipe[PIPE_WRITE]);
+            }
+            else
+            {
+                dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                close(next_pipe[PIPE_READ]);
+                close(next_pipe[PIPE_WRITE]);
+            }
+
+            new_child(j, p, fg);
+            redirect(p);
+            if (execvp(p->argv[0], p->argv) < 0)
+            {
                 exit(EXIT_FAILURE);
+            }
 
-            case 0: /* child process  */
-                p->pid = getpid();
+            perror("New child should have done an exec");
+            exit(EXIT_FAILURE); /* NOT REACHED */
 
-                set_pgid(j, p);
+        default: /* parent */
+            /* establish child process group */
+            p->pid = pid;
+            set_pgid(j, p);
 
-                if (p != j->first_process) {
-                    close(prev_pipe[PIPE_WRITE]);
-                    dup2(prev_pipe[PIPE_READ], STDIN_FILENO);
-                    close(prev_pipe[PIPE_READ]);
-                }
-                if (p->next) {
-                    close(next_pipe[PIPE_READ]);
-                    dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
-                    close(next_pipe[PIPE_WRITE]);
-                } else {
-                    dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
-                    close(next_pipe[PIPE_READ]);
-                    close(next_pipe[PIPE_WRITE]);
-                }
-
-                new_child(j, p, fg);
-                redirect(p);
-                if (execvp(p->argv[0], p->argv) < 0) {
-                    exit(EXIT_FAILURE);
-                }
-
-
-                perror("New child should have done an exec");
-                exit(EXIT_FAILURE);  /* NOT REACHED */
-
-            default: /* parent */
-                /* establish child process group */
-                p->pid = pid;
-                set_pgid(j, p);
-
-                /* YOUR CODE HERE?  Parent-side code for new process.  */
-                prev_pipe[PIPE_WRITE] = next_pipe[PIPE_WRITE];
-                prev_pipe[PIPE_READ] = next_pipe[PIPE_READ];
-                break;
+            /* YOUR CODE HERE?  Parent-side code for new process.  */
+            prev_pipe[PIPE_WRITE] = next_pipe[PIPE_WRITE];
+            prev_pipe[PIPE_READ] = next_pipe[PIPE_READ];
+            break;
         }
 
         /* YOUR CODE HERE?  Parent-side code for new job.*/
-        if (p->next == NULL) {
+        if (p->next == NULL)
+        {
             close(next_pipe[PIPE_READ]);
         }
         close(prev_pipe[PIPE_WRITE]);
@@ -388,16 +459,65 @@ void spawn_job(job_t *j, bool fg)
     }
 }
 
+void assignment(string cmdline)
+{
+    string var = cmdline.substr(0, cmdline.find("="));
+    string value = cmdline.substr(cmdline.find("=") + 1);
+
+    if (value.find_first_not_of("0123456789") == string::npos)
+    {
+        int tmp = stoi(value);
+        intVariables[var] = tmp;
+    }
+    else if (value.find('"') != string::npos)
+    {
+        strVariables[var] = value;
+    }
+    else
+    {
+        // cout << value << endl;
+        if (intVariables.find(value) != intVariables.end())
+        {
+            intVariables[var] = intVariables[value];
+        }
+        else
+        {
+            strVariables[var] = strVariables[value];
+        }
+    }
+}
+
+void print(string cmdline)
+{
+    string content = cmdline.substr(5);
+    if (content.find("$") != string::npos)
+    {
+        content = content.substr(1);
+        if (intVariables.find(content) != intVariables.end())
+        {
+            cout << intVariables[content] << endl;
+        }
+        else if (strVariables.find(content) != strVariables.end())
+        {
+            cout << strVariables[content] << endl;
+        }
+    } else {
+        cout << content << endl;
+    }
+}
 
 int main()
 {
     init_dsh();
-//    DEBUG("Successfully initialized\n");
+    //    DEBUG("Successfully initialized\n");
 
-    while(1) {
+    while (1)
+    {
         job_t *j = NULL;
-        if(!(j = readcmdline(promptmsg()))) {
-            if (feof(stdin)) { /* End of file (ctrl-d) */
+        if (!(j = readcmdline(promptmsg())))
+        {
+            if (feof(stdin))
+            { /* End of file (ctrl-d) */
                 fflush(stdout);
                 printf("\n");
                 exit(EXIT_SUCCESS);
@@ -405,15 +525,63 @@ int main()
             continue; /* NOOP; user entered return or spaces with return */
         }
 
-        if (strcmp(j->commandinfo, "shell") == 0) {
-            while (1) {
-                char *cmdline = (char *)calloc(MAX_LEN_CMDLINE, sizeof(char));
+        if (strcmp(j->commandinfo, "shell") == 0)
+        {
+            while (1)
+            {
+                string cmdline;
+
                 fprintf(stdout, ">>> ");
-                fgets(cmdline, MAX_LEN_CMDLINE, stdin);
-                if (strcmp(cmdline, "exit\n") == 0) {
+                getline(cin, cmdline);
+                if (cmdline.compare("exit") == 0)
+                {
                     break;
                 }
-                free(cmdline);
+                else if (cmdline.find("=") != string::npos)
+                {
+                    assignment(cmdline);
+                }
+                else if (cmdline.substr(0, 5).compare("echo ") == 0)
+                {
+                    print(cmdline);
+                } // for i in range(start, end, step):
+                else if (cmdline.substr(0, 3).compare("for") == 0)
+                {
+                    string var = cmdline.substr(cmdline.find(" ") + 1);
+                    var = var.substr(0, cmdline.find(" "));
+                    string range = cmdline.substr(cmdline.find("{"));
+                    size_t comma = std::count(range.begin(), range.end(), '.');
+                    // cout << comma << endl;
+                    // cout << range << endl;
+                    int start = 0;
+                    int end = 0;
+                    int step = 1;
+
+                    if (comma == 2)
+                    {
+                        start = stoi(range.substr(1, range.find(".") - 1));
+                        int tmp = range.find(".") + 2;
+                        end = stoi(range.substr(tmp, range.find("}") - tmp));
+                    }
+                    else
+                    {
+                        start = stoi(range.substr(1, range.find(".") - 1));
+                        range = range.substr(range.find(".") + 2);
+                        end = stoi(range.substr(0, range.find(".")));
+                        range = range.substr(range.find(".") + 2);
+                        step = stoi(range.substr(0, range.find("}")));
+                    }
+
+                    
+
+
+                    // cout << start << endl;
+                    // cout << end << endl;
+                    // cout << step << endl;
+                }
+
+                // unordered_map<string, int> intVariables;
+                // unordered_map<string, string> strVariables;
             }
             free(j->commandinfo);
             free(j);
@@ -422,8 +590,7 @@ int main()
 
         /* Only for debugging purposes to show parser output; turn off in the
          * final code */
-//        if(PRINT_INFO) print_job(j);
-
+        //        if(PRINT_INFO) print_job(j);
 
         /* Your code goes here */
         /* You need to loop through jobs list since a command line can contain ;*/
@@ -434,10 +601,12 @@ int main()
         /* else */
         /* spawn_job(j,false) */
 
-        while (j) {
+        while (j)
+        {
             int argc = j->first_process->argc;
             char **argv = j->first_process->argv;
-            if(!builtin_cmd(j, argc, argv)){
+            if (!builtin_cmd(j, argc, argv))
+            {
                 spawn_job(j, !(j->bg));
             }
             j = j->next;
