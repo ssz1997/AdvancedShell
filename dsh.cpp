@@ -14,6 +14,7 @@ unordered_map<string, int> intVariables;
 unordered_map<string, string> strVariables;
 
 job_t *job_list = NULL; // first job
+bool assigncmd = false;
 
 static const int PIPE_READ = 0;
 static const int PIPE_WRITE = 1;
@@ -33,7 +34,6 @@ void print_jobs();                                        // print jobs in the l
 bool builtin_cmd(job_t *last_job, int argc, char **argv); // execute built-in cmd
 void spawn_job(job_t *j, bool fg);                        // spawn a new job
 
-void print(string cmdline);
 void assignment(string cmdline);
 int *getForLoop(string cmdline);
 
@@ -428,6 +428,13 @@ void spawn_job(job_t *j, bool fg)
             else
             {
                 dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                // redirect to local
+                if (assigncmd)
+                {
+                    int log = open("slogs.log", 0666);
+                    dup2(log, STDOUT_FILENO);
+                    close(log);
+                }
                 close(next_pipe[PIPE_READ]);
                 close(next_pipe[PIPE_WRITE]);
             }
@@ -468,48 +475,58 @@ void assignment(string cmdline)
 {
     string var = cmdline.substr(0, cmdline.find("="));
     string value = cmdline.substr(cmdline.find("=") + 1);
-
-    if (value.find_first_not_of("0123456789") == string::npos)
+    int index = 0;
+    if ((index = value.find('$')) != string::npos)
     {
-        int tmp = stoi(value);
-        intVariables[var] = tmp;
-    }
-    else if (value.find('"') != string::npos)
-    {
-        strVariables[var] = value;
-    }
-    else
-    {
-        // cout << value << endl;
-        if (intVariables.find(value) != intVariables.end())
+        if (value[index + 1] == '(')
         {
-            intVariables[var] = intVariables[value];
+            // its a command
+            string unixcmd = value.substr(index + 2, value.find(')') - index - 2);
+            assigncmd = true;
+            job_t *tmp = readcommandline(unixcmd.c_str());
+            while (tmp)
+            {
+                int argc = tmp->first_process->argc;
+                char **argv = tmp->first_process->argv;
+                if (!builtin_cmd(tmp, argc, argv))
+                {
+                    spawn_job(tmp, !(tmp->bg));
+                }
+                tmp = tmp->next;
+            }
+
+            FILE *out = fopen("slogs.log", "r+");
+            fseek(out, 0, SEEK_END);
+            int lSize = ftell(out);
+            rewind(out);
+            // printf("%d\n", lSize);
+            if (lSize != 0)
+            {
+                char *buffer = (char *)calloc(1, lSize + 1);
+                if (1 != fread(buffer, lSize, 1, out))
+                {
+                    fclose(out), free(buffer), fputs("1entire read fails", stderr), exit(1);
+                }
+                string cmdOutput(buffer);
+                strVariables[var] = cmdOutput;
+            }
+            assigncmd = false;
         }
         else
         {
-            strVariables[var] = strVariables[value];
+            strVariables[var] = strVariables.count(value) ? strVariables[value.substr(1)] : "";
         }
     }
-}
 
-void print(string cmdline)
-{
-    string content = cmdline.substr(5);
-    if (content.find("$") != string::npos)
+    // if (value.find_first_not_of("0123456789") == string::npos)
+    // {
+    //     int tmp = stoi(value);
+    //     intVariables[var] = tmp;
+    // }
+    // else
+    else if (value.find('"') != string::npos)
     {
-        content = content.substr(1);
-        if (intVariables.find(content) != intVariables.end())
-        {
-            cout << intVariables[content] << endl;
-        }
-        else if (strVariables.find(content) != strVariables.end())
-        {
-            cout << strVariables[content] << endl;
-        }
-    }
-    else
-    {
-        cout << content << endl;
+        strVariables[var] = value.substr(1, value.length()-2);
     }
 }
 
@@ -540,6 +557,24 @@ int *getForLoop(string cmdline)
     }
     // cout << arr[0] << arr[1] << endl;
     return arr;
+}
+
+string parse(string cmdline)
+{
+    string res = "";
+    for (int i = 0; i < cmdline.size(); i++) {
+        if (cmdline[i] == '$') {
+            int tp = i;
+            while (cmdline[tp] != ' ' && tp < cmdline.size()) {
+                tp++;
+            }
+            string key = cmdline.substr(i + 1, tp - i -1);
+            res += strVariables.count(key) ? strVariables[key] : "";
+        } else {
+            res.push_back(cmdline[i]);
+        }
+    }
+    return res;
 }
 
 int main()
@@ -577,10 +612,7 @@ int main()
                 {
                     assignment(cmdline);
                 }
-                else if (cmdline.substr(0, 5).compare("echo ") == 0)
-                {
-                    print(cmdline);
-                } // for i in range(start, end, step):
+                // for i in range(start, end, step):
                 else if (cmdline.substr(0, 3).compare("for") == 0)
                 {
                     string var = cmdline.substr(cmdline.find(" ") + 1);
@@ -614,22 +646,43 @@ int main()
                         for (int i = 1; i < commands.size(); i++)
                         {
                             string tcmd = commands[i];
-                            if (tcmd.substr(0, 5).compare("echo ") == 0)
-                            {
-                                print(tcmd);
-                            }
-                            else if (tcmd.find("=") != string::npos)
+                            if (tcmd.find("=") != string::npos)
                             {
                                 assignment(tcmd);
+                            }
+                            else
+                            {
+                                job_t *tmp = readcommandline(tcmd.c_str());
+                                while (tmp)
+                                {
+                                    int argc = tmp->first_process->argc;
+                                    char **argv = tmp->first_process->argv;
+                                    if (!builtin_cmd(tmp, argc, argv))
+                                    {
+                                        spawn_job(tmp, !(tmp->bg));
+                                    }
+                                    tmp = tmp->next;
+                                }
                             }
                         }
                     }
 
                     // use for loop to exe every command
                 }
-
-                // unordered_map<string, int> intVariables;
-                // unordered_map<string, string> strVariables;
+                else
+                {   cmdline = parse(cmdline);
+                    job_t *tmp = readcommandline(cmdline.c_str());
+                    while (tmp)
+                    {
+                        int argc = tmp->first_process->argc;
+                        char **argv = tmp->first_process->argv;
+                        if (!builtin_cmd(tmp, argc, argv))
+                        {
+                            spawn_job(tmp, !(tmp->bg));
+                        }
+                        tmp = tmp->next;
+                    }
+                }
             }
             free(j->commandinfo);
             free(j);

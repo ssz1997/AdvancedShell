@@ -106,6 +106,7 @@ int endswith(const char* haystack, const char* needle);
  *
  * The parser supports these symbols: <, >, |, &, ;
  */
+job_t* readcommandline(const char *commandline);
 
 job_t* readcmdline(char *msg);
 

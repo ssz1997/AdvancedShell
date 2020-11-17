@@ -104,7 +104,10 @@ job_t* readcmdline(char *msg)
         	return NULL;
     	}
 	fgets(cmdline, MAX_LEN_CMDLINE, stdin);
+	return readcommandline(cmdline);
+}
 
+job_t* readcommandline(const char* cmdline) {
 	if (strcmp(cmdline, "shell") == 0) {
         job_t *newjob = (job_t *)malloc(sizeof(job_t));
         init_job(newjob);
