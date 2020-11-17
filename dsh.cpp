@@ -589,7 +589,7 @@ int main()
                     // cout << "var: " << var << endl;
                     int *forinfo = getForLoop(cmdline);
 
-                                        int start = forinfo[0];
+                    int start = forinfo[0];
                     int end = forinfo[1];
                     int step = forinfo[2];
                     delete forinfo;
