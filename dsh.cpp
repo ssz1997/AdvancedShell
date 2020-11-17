@@ -210,7 +210,7 @@ void parent_wait(job_t *j, int fg)
                 p->completed = true;
                 if (status == EXIT_SUCCESS)
                 {
-                    printf("%d (Completed): %s 1234", pid, p->argv[0]);
+                    printf("%d (Completed): %s\n", pid, p->argv[0]);
                 }
                 else
                 {
@@ -239,7 +239,6 @@ void parent_wait(job_t *j, int fg)
             {
                 p->completed = 1;
             }
-            printf("com??");
             if (job_is_stopped(j) && isatty(STDIN_FILENO))
             {
                 seize_tty(getpid());
@@ -927,7 +926,6 @@ int main()
             if (j->bg) {
                 strcat(name, "&");
             }
-            printf("%s\n", name);
             add_command_to_history(name);
             memset(name, 0, 65536);
             j = j->next;
