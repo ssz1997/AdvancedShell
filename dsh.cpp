@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <fstream>
 
 using namespace std;
 static char prompt_head[20];
@@ -431,10 +432,11 @@ void spawn_job(job_t *j, bool fg)
                 // redirect to local
                 if (assigncmd)
                 {
-                    int log = open("slogs.log", 0666);
+                    int log = open("slogs.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     dup2(log, STDOUT_FILENO);
                     close(log);
                 }
+
                 close(next_pipe[PIPE_READ]);
                 close(next_pipe[PIPE_WRITE]);
             }
@@ -495,21 +497,21 @@ void assignment(string cmdline)
                 tmp = tmp->next;
             }
 
-            FILE *out = fopen("slogs.log", "r+");
-            fseek(out, 0, SEEK_END);
-            int lSize = ftell(out);
-            rewind(out);
-            // printf("%d\n", lSize);
-            if (lSize != 0)
+            string output = "";
+            string line;
+            ifstream myfile;
+            myfile.open("slogs.log");
+            if (!myfile.is_open())
             {
-                char *buffer = (char *)calloc(1, lSize + 1);
-                if (1 != fread(buffer, lSize, 1, out))
-                {
-                    fclose(out), free(buffer), fputs("1entire read fails", stderr), exit(1);
-                }
-                string cmdOutput(buffer);
-                strVariables[var] = cmdOutput;
+                perror("Error open");
+                exit(EXIT_FAILURE);
             }
+            while (getline(myfile, line))
+            {
+                output += line;
+            }
+            strVariables[var] = output;
+            myfile.close();
             assigncmd = false;
         }
         else
@@ -517,16 +519,14 @@ void assignment(string cmdline)
             strVariables[var] = strVariables.count(value) ? strVariables[value.substr(1)] : "";
         }
     }
-
-    // if (value.find_first_not_of("0123456789") == string::npos)
-    // {
-    //     int tmp = stoi(value);
-    //     intVariables[var] = tmp;
-    // }
-    // else
     else if (value.find('"') != string::npos)
     {
-        strVariables[var] = value.substr(1, value.length()-2);
+        strVariables[var] = value.substr(1, value.length() - 2);
+    }
+    else
+    {
+        strVariables[var] = value;
+        // cout << "my value: " << value << endl;
     }
 }
 
@@ -562,18 +562,24 @@ int *getForLoop(string cmdline)
 string parse(string cmdline)
 {
     string res = "";
-    for (int i = 0; i < cmdline.size(); i++) {
-        if (cmdline[i] == '$') {
+    for (int i = 0; i < cmdline.size(); i++)
+    {
+        if (cmdline[i] == '$')
+        {
             int tp = i;
-            while (cmdline[tp] != ' ' && tp < cmdline.size()) {
-                tp++;
+            while (cmdline[i] != ' ' && i < cmdline.size())
+            {
+                i++;
             }
-            string key = cmdline.substr(i + 1, tp - i -1);
+            string key = cmdline.substr(tp + 1, i - tp - 1);
             res += strVariables.count(key) ? strVariables[key] : "";
-        } else {
+        }
+        else
+        {
             res.push_back(cmdline[i]);
         }
     }
+    cout << "parse result: " << res << endl;
     return res;
 }
 
@@ -626,6 +632,7 @@ int main()
                     int step = forinfo[2];
                     delete forinfo;
                     intVariables[var] = start;
+                    strVariables[var] = to_string(start);
 
                     string forcommand;
                     vector<string> commands;
@@ -643,6 +650,7 @@ int main()
                     }
                     for (intVariables[var] = start; intVariables[var] <= end; intVariables[var] += step)
                     {
+                        strVariables[var] = to_string(intVariables[var]);
                         for (int i = 1; i < commands.size(); i++)
                         {
                             string tcmd = commands[i];
@@ -652,6 +660,7 @@ int main()
                             }
                             else
                             {
+                                tcmd = parse(tcmd);
                                 job_t *tmp = readcommandline(tcmd.c_str());
                                 while (tmp)
                                 {
@@ -670,7 +679,8 @@ int main()
                     // use for loop to exe every command
                 }
                 else
-                {   cmdline = parse(cmdline);
+                {
+                    cmdline = parse(cmdline);
                     job_t *tmp = readcommandline(cmdline.c_str());
                     while (tmp)
                     {

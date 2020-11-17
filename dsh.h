@@ -16,7 +16,7 @@
 #define MAX_LEN_FILENAME 80
 
 /*Max length of the command line */
-#define MAX_LEN_CMDLINE	120
+#define MAX_LEN_CMDLINE	12000
 
 #define MAX_ARGS 20 /* Maximum number of arguments to any command */
 
