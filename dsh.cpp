@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <stdarg.h>
-#include <string.h>
+#include <fstream>
 
 using namespace std;
 static char prompt_head[20];
@@ -18,6 +18,7 @@ unordered_map<string, int> intVariables;
 unordered_map<string, string> strVariables;
 
 job_t *job_list = NULL; // first job
+bool assigncmd = false;
 
 static const int PIPE_READ = 0;
 static const int PIPE_WRITE = 1;
@@ -208,13 +209,16 @@ void parent_wait(job_t *j, int fg)
                 p->completed = true;
                 if (status == EXIT_SUCCESS)
                 {
-                    printf("%d (Completed): %s\n", pid, p->argv[0]);
+                    cout << 1234 << endl;
+                    printf("%d, %s\n", pid, p->argv[0]);
+                    printf("%d (Completed): %s 1234", pid, p->argv[0]);
+                    printf("abcd1234");
                 }
                 else
                 {
                     printf("%d (Failed): %s\n", pid, p->argv[0]);
                 }
-                fflush(stdout);
+                //fflush(stdout);
             }
             else if (WIFSTOPPED(status))
             {
@@ -237,6 +241,7 @@ void parent_wait(job_t *j, int fg)
             {
                 p->completed = 1;
             }
+            printf("com??");
             if (job_is_stopped(j) && isatty(STDIN_FILENO))
             {
                 seize_tty(getpid());
@@ -517,20 +522,29 @@ void spawn_job(job_t *j, bool fg)
             }
             else
             {
-                if (p->ofile) {
-                    dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
-                    char log[1024];
-                    snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
-                    log_output(log);
-                }
-                else {
-                    char name[20];
-                    snprintf(name, 20, "logs/%d.log", p->pid);
-                    int log = creat(name, 0644);
-                    dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                if (assigncmd)
+                {
+                    int log = open("slogs.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     dup2(log, STDOUT_FILENO);
                     close(log);
                 }
+                else {
+                    if (p->ofile) {
+                        dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                        char log[1024];
+                        snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
+                        log_output(log);
+                    }
+                    else {
+                        char name[20];
+                        snprintf(name, 20, "logs/%d.log", p->pid);
+                        int log = creat(name, 0644);
+                        dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                        dup2(log, STDOUT_FILENO);
+                        close(log);
+                    }
+                }
+                
                 close(next_pipe[PIPE_READ]);
                 close(next_pipe[PIPE_WRITE]);
             }
@@ -615,50 +629,59 @@ void assignment(string cmdline)
 {
     string var = cmdline.substr(0, cmdline.find("="));
     string value = cmdline.substr(cmdline.find("=") + 1);
-
-    if (value.find_first_not_of("0123456789") == string::npos)
+    int index = 0;
+    if ((index = value.find('$')) != string::npos)
     {
-        int tmp = stoi(value);
-        intVariables[var] = tmp;
-    }
-    else if (value.find('"') != string::npos)
-    {
-        strVariables[var] = value;
-    }
-    else
-    {
-        // cout << value << endl;
-        if (intVariables.find(value) != intVariables.end())
+        if (value[index + 1] == '(')
         {
-            intVariables[var] = intVariables[value];
+            // its a command
+            string unixcmd = value.substr(index + 2, value.find(')') - index - 2);
+            assigncmd = true;
+            job_t *tmp = readcommandline(unixcmd.c_str());
+            while (tmp)
+            {
+                int argc = tmp->first_process->argc;
+                char **argv = tmp->first_process->argv;
+                if (!builtin_cmd(tmp, argc, argv))
+                {
+                    spawn_job(tmp, !(tmp->bg));
+                }
+                tmp = tmp->next;
+            }
+            
+            string output = "";
+            string line;
+            ifstream myfile;
+            myfile.open("slogs.log");
+            if (!myfile.is_open())
+            {
+                perror("Error open");
+                exit(EXIT_FAILURE);
+            }
+            while (getline(myfile, line))
+            {
+                output += line;
+            }
+            strVariables[var] = output;
+            myfile.close();
+            assigncmd = false;
         }
         else
         {
-            strVariables[var] = strVariables[value];
+            strVariables[var] = strVariables.count(value) ? strVariables[value.substr(1)] : "";
         }
     }
-}
-
-void print(string cmdline)
-{
-    string content = cmdline.substr(5);
-    if (content.find("$") != string::npos)
+    else if (value.find('"') != string::npos)
     {
-        content = content.substr(1);
-        if (intVariables.find(content) != intVariables.end())
-        {
-            cout << intVariables[content] << endl;
-        }
-        else if (strVariables.find(content) != strVariables.end())
-        {
-            cout << strVariables[content] << endl;
-        }
+        strVariables[var] = value.substr(1, value.length() - 2);
     }
     else
     {
-        cout << content << endl;
+        strVariables[var] = value;
+        // cout << "my value: " << value << endl;
     }
 }
+
 
 int *getForLoop(string cmdline)
 {
@@ -687,6 +710,30 @@ int *getForLoop(string cmdline)
     }
     // cout << arr[0] << arr[1] << endl;
     return arr;
+}
+
+string parse(string cmdline)
+{
+    string res = "";
+    for (int i = 0; i < cmdline.size(); i++)
+    {
+        if (cmdline[i] == '$')
+        {
+            int tp = i;
+            while (cmdline[i] != ' ' && i < cmdline.size())
+            {
+                i++;
+            }
+            string key = cmdline.substr(tp + 1, i - tp - 1);
+            res += strVariables.count(key) ? strVariables[key] : "";
+        }
+        else
+        {
+            res.push_back(cmdline[i]);
+        }
+    }
+    cout << "parse result: " << res << endl;
+    return res;
 }
 
 void add_command_to_history(const char *command) {
@@ -774,10 +821,6 @@ int main()
                 {
                     assignment(cmdline);
                 }
-                else if (cmdline.substr(0, 5).compare("echo ") == 0)
-                {
-                    print(cmdline);
-                } // for i in range(start, end, step):
                 else if (cmdline.substr(0, 3).compare("for") == 0)
                 {
                     string var = cmdline.substr(cmdline.find(" ") + 1);
@@ -786,11 +829,12 @@ int main()
                     // cout << "var: " << var << endl;
                     int *forinfo = getForLoop(cmdline);
 
-                                        int start = forinfo[0];
+                    int start = forinfo[0];
                     int end = forinfo[1];
                     int step = forinfo[2];
                     delete forinfo;
                     intVariables[var] = start;
+                    strVariables[var] = to_string(start);
 
                     string forcommand;
                     vector<string> commands;
@@ -808,25 +852,49 @@ int main()
                     }
                     for (intVariables[var] = start; intVariables[var] <= end; intVariables[var] += step)
                     {
+                        strVariables[var] = to_string(intVariables[var]);
                         for (int i = 1; i < commands.size(); i++)
                         {
                             string tcmd = commands[i];
-                            if (tcmd.substr(0, 5).compare("echo ") == 0)
-                            {
-                                print(tcmd);
-                            }
-                            else if (tcmd.find("=") != string::npos)
+                            if (tcmd.find("=") != string::npos)
                             {
                                 assignment(tcmd);
+                            }
+                            else
+                            {
+                                tcmd = parse(tcmd);
+                                job_t *tmp = readcommandline(tcmd.c_str());
+                                while (tmp)
+                                {
+                                    int argc = tmp->first_process->argc;
+                                    char **argv = tmp->first_process->argv;
+                                    if (!builtin_cmd(tmp, argc, argv))
+                                    {
+                                        spawn_job(tmp, !(tmp->bg));
+                                    }
+                                    tmp = tmp->next;
+                                }
                             }
                         }
                     }
 
                     // use for loop to exe every command
                 }
-
-                // unordered_map<string, int> intVariables;
-                // unordered_map<string, string> strVariables;
+                else
+                {
+                    cmdline = parse(cmdline);
+                    job_t *tmp = readcommandline(cmdline.c_str());
+                    while (tmp)
+                    {
+                        int argc = tmp->first_process->argc;
+                        char **argv = tmp->first_process->argv;
+                        if (!builtin_cmd(tmp, argc, argv))
+                        {
+                            spawn_job(tmp, !(tmp->bg));
+                        }
+                        tmp = tmp->next;
+                    }
+                }
             }
             free(j->commandinfo);
             free(j);
