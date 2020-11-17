@@ -157,7 +157,7 @@ void new_child(job_t *j, process_t *p, bool fg)
     /* also establish child process group in child to avoid race (if parent has not done it yet). */
     set_pgid(j, p);
 
-    if (fg)                 // if fg is set
+    if (fg && isatty(STDIN_FILENO))                 // if fg is set
         seize_tty(j->pgid); // assign the terminal
 
     /* Set the handling for job control signals back to the default. */
