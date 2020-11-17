@@ -6,18 +6,16 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
-#include <stdarg.h>
-#include <string.h>
+#include <fstream>
 
 using namespace std;
 static char prompt_head[20];
-static const char *history[100];
-unsigned history_count = 0;
 
 unordered_map<string, int> intVariables;
 unordered_map<string, string> strVariables;
 
 job_t *job_list = NULL; // first job
+bool assigncmd = false;
 
 static const int PIPE_READ = 0;
 static const int PIPE_WRITE = 1;
@@ -37,14 +35,12 @@ void print_jobs();                                        // print jobs in the l
 bool builtin_cmd(job_t *last_job, int argc, char **argv); // execute built-in cmd
 void spawn_job(job_t *j, bool fg);                        // spawn a new job
 
-void print(string cmdline);
 void assignment(string cmdline);
 int *getForLoop(string cmdline);
-void add_command_to_history(const char *command);
-void log_output(char *output);
 
 job_t *search_job(int jid)
 {
+    DEBUG("search_job");
     job_t *job = job_list;
     while (job != NULL)
     {
@@ -57,6 +53,7 @@ job_t *search_job(int jid)
 
 job_t *search_job_pos(int pos)
 {
+    DEBUG("search_job_pos");
     job_t *job = job_list;
     int count = pos;
     while (job != NULL)
@@ -128,9 +125,7 @@ void redirect(process_t *p)
 
     if (p->ofile)
     {
-        char * name = p->ofile;
-        strtok(name, "\n");
-        int fd = creat(name, 0644);
+        int fd = creat(p->ofile, 0644);
         if (fd >= 0)
         {
             dup2(fd, STDOUT_FILENO);
@@ -178,6 +173,7 @@ void continue_job(job_t *j)
         p->stopped = false;
         p = p->next;
     }
+
     if (kill(-j->pgid, SIGCONT) < 0)
     {
         printf("Kill SIGCONT");
@@ -197,6 +193,7 @@ char *promptmsg()
 
 void parent_wait(job_t *j, int fg)
 {
+    DEBUG("parent_wait");
     if (fg)
     {
         int status, pid;
@@ -218,6 +215,7 @@ void parent_wait(job_t *j, int fg)
             }
             else if (WIFSTOPPED(status))
             {
+                DEBUG("Process %d stopped", p->pid);
                 if (kill(-j->pgid, SIGSTOP) < 0)
                 {
                     //                    logger(STDERR_FILENO,"Kill (SIGSTOP) failed.");
@@ -231,10 +229,12 @@ void parent_wait(job_t *j, int fg)
 
             else if (WIFCONTINUED(status))
             {
+                DEBUG("Process %d resumed", p->pid);
                 p->stopped = 0;
             }
             else if (WIFSIGNALED(status))
             {
+                DEBUG("Process %d terminated", p->pid);
                 p->completed = 1;
             }
             if (job_is_stopped(j) && isatty(STDIN_FILENO))
@@ -261,29 +261,13 @@ void print_jobs()
     {
         printf("[%d]", count);
         if (j->notified)
-        {
             printf("    Stopped     ");
-            char log[1024];
-            char *target = log;
-            target += sprintf(target, "[%d]    Stopped     \n~", count);
-            log_output(log);
-        }
         else
         {
-            char log[1024];
-            char *target = log;
             if (j->bg)
-            {
                 printf(" bg ");
-                sprintf(target, " bg  Running        %s\n", j->commandinfo);
-                log_output(log);
-            }
             else
-            {
                 printf(" fg ");
-                sprintf(target, " fg  Running        %s\n", j->commandinfo);
-                log_output(log);
-            }
             printf(" Running        ");
         }
         printf("%s\n", j->commandinfo);
@@ -298,6 +282,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
 
     /* check whether the cmd is a built in command
      */
+    DEBUG("builtin_cmd");
 
     if (!strcmp(argv[0], "quit"))
     {
@@ -308,71 +293,11 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         print_jobs();
         return true;
     }
-    else if (!strcmp("history", argv[0])) {
-        if (argc == 1) {
-            char buffer[1024];
-            char *target = buffer;
-            if (history_count == 0) {
-                printf("No commands ever ran in this session.");
-                strcat(buffer, "No commands ever ran in this session.\n~");
-                log_output(buffer);
-                return true;
-            }
-            for (int i = 0; i < history_count; i++) {
-                printf("%d: %s\n", i+1, history[i]);
-                target += sprintf(target, "%d: %s\n", i+1, history[i]);
-            }
-            target += sprintf(target, "~");
-            log_output(buffer);
-            return true;
-        }
-        else {
-            int index = atoi(argv[1]);    // unsafe
-            FILE *fp = fopen ("output.log", "r+" );
-            fseek(fp, 0L, SEEK_END);
-            int lSize = ftell(fp);
-            rewind(fp);
-            
-            char *buffer = (char*) calloc( 1, lSize+1 );
-            
-            if( 1!=fread(buffer, lSize, 1, fp)){
-                fclose(fp),free(buffer),fputs("entire read fails",stderr),exit(1);
-            }
-            char * o = strtok(buffer, "~");
-            int count = 1;
-            while (count < index) {
-                o = strtok(NULL, "~");
-                //printf("count: %d, o: %s\n", count, o);
-                count ++;
-            }
-            printf("Output:\n");
-            char *oo = strtok(o, "\n");
-            char output_buffer[1024];
-            strcat(output_buffer, "Output:\n");
-            while (oo != NULL) {
-                printf("\t%s\n", oo);
-                strcat(output_buffer, "\t");
-                strcat(output_buffer, oo);
-                strcat(output_buffer, "\n");
-                oo = strtok(NULL, "\n");
-            }
-            fclose(fp);
-            free(buffer);
-            strcat(output_buffer, "~\n");
-            log_output(output_buffer);
-            return true;
-        }
-    }
     else if (!strcmp("cd", argv[0]))
     {
         if (argc <= 1 || chdir(argv[1]) == -1)
         {
-            printf("Error: invalid arguments for directory change");
-            log_output("Error: invalid arguments for directory change\n~");
-        }
-        else
-        {
-            log_output("Note: cd command has no output\n~");
+            //            logger(STDERR_FILENO,"Error: invalid arguments for directory change");
         }
         return true;
     }
@@ -385,26 +310,21 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         if (argc != 2 || !(position = atoi(argv[1])))
         {
             printf("%d %d", position, argc);
-            printf("Error: invalid arguments for bg command");
-            log_output("Error: invalid arguments for bg command\n~");
+            //            logger(STDERR_FILENO,"Error: invalid arguments for bg command");
             return true;
         }
         if (!(job = search_job_pos(position)))
         {
             printf("%d %d", position, argc);
-            printf("Error: Could not find requested job");
-            log_output("Error: Could not find requested job");
+            //            logger(STDERR_FILENO, "Error: Could not find requested job");
             return true;
         }
         if (job_is_completed(job))
         {
-            printf("Error: this job is already completed.");
-            log_output("Error: this job is already completed.");
+            //            logger(STDERR_FILENO, "Error: job is already completed!");
             return true;
         }
-        char log[1024];
-        char *target = log;
-        log_output(log);
+
         printf("#Sending job '%s' to background\n", job->commandinfo);
         fflush(stdout);
         continue_job(job);
@@ -429,41 +349,32 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         {
             if (!(job = search_job_pos(pos)))
             {
-                printf("Error: Could not find requested job");
-                log_output("Error: Could not find requested job");
+                //                logger(STDERR_FILENO, "Could not find requested job");
                 return true;
             }
             if (job->notified == false)
             {
-                printf("Error: Could not find requested job");
-                log_output("Error: Could not find requested job");
+                //                logger(STDERR_FILENO, "The job is already in foreground.");
                 return true;
             }
             if (job_is_completed(job))
             {
-                printf("Error: this job is already completed.");
-                log_output("Error: this job is already completed.");
+                //                logger(STDERR_FILENO,"Job already completed!");
                 return true;
             }
         }
         else
         {
-            printf("Error: invalid arguments for fg command");
-            log_output("Error: invalid arguments for fg command\n~");
+            //            logger(STDERR_FILENO,"Invalid arguments for fg command");
             return true;
         }
-        char log[1024];
-        char *target = log;
-        log_output(log);
+
         printf("#Bringing job '%s' to foreground\n", job->commandinfo);
         fflush(stdout);
         continue_job(job);
         job->bg = false;
-        
         if (isatty(STDIN_FILENO))
             seize_tty(job->pgid);
-        
-
         parent_wait(job, true);
         return true;
     }
@@ -480,6 +391,7 @@ void spawn_job(job_t *j, bool fg)
 
     for (p = j->first_process; p; p = p->next)
     {
+
         /* YOUR CODE HERE? */
         if (p->argv[0] == NULL)
         {
@@ -488,6 +400,7 @@ void spawn_job(job_t *j, bool fg)
         int next_pipe[2];
 
         pipe(next_pipe);
+
         /* Builtin commands are already taken care earlier */
         switch (pid = fork())
         {
@@ -501,7 +414,6 @@ void spawn_job(job_t *j, bool fg)
 
             set_pgid(j, p);
 
-
             if (p != j->first_process)
             {
                 close(prev_pipe[PIPE_WRITE]);
@@ -513,24 +425,18 @@ void spawn_job(job_t *j, bool fg)
                 close(next_pipe[PIPE_READ]);
                 dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
                 close(next_pipe[PIPE_WRITE]);
-
             }
             else
             {
-                if (p->ofile) {
-                    dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
-                    char log[1024];
-                    snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
-                    log_output(log);
-                }
-                else {
-                    char name[20];
-                    snprintf(name, 20, "logs/%d.log", p->pid);
-                    int log = creat(name, 0644);
-                    dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                // redirect to local
+                if (assigncmd)
+                {
+                    int log = open("slogs.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     dup2(log, STDOUT_FILENO);
                     close(log);
                 }
+
                 close(next_pipe[PIPE_READ]);
                 close(next_pipe[PIPE_WRITE]);
             }
@@ -539,10 +445,6 @@ void spawn_job(job_t *j, bool fg)
             redirect(p);
             if (execvp(p->argv[0], p->argv) < 0)
             {
-                //char buffer[1024];
-                //snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
-                //log_output(buffer);
-                //printf("%s: Command not found.", p->argv[0]);
                 exit(EXIT_FAILURE);
             }
 
@@ -568,46 +470,6 @@ void spawn_job(job_t *j, bool fg)
         close(prev_pipe[PIPE_WRITE]);
 
         parent_wait(j, fg);
-        if (fg && p->next == NULL){
-            if (p->ofile) {}
-            else{
-                char name[20];
-                snprintf(name, 20, "logs/%d.log", p->pid);
-                FILE *out = fopen(name, "r+");
-                fseek(out, 0, SEEK_END);
-                int lSize = ftell(out);
-                rewind(out);
-                if (lSize != 0) {
-                    char *buffer = (char*)calloc( 1, lSize+1 );
-                    if( 1!=fread(buffer, lSize, 1, out)){
-                        fclose(out),free(buffer),fputs("entire read fails",stderr),exit(1);
-                    }
-                    printf("%s\n", buffer);
-                    strcat(buffer, "~");
-                    log_output(buffer);
-                }
-                else {
-                    char buffer[1024];
-                    snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
-                    log_output(buffer);
-                    printf("%s: Command not found.", p->argv[0]);
-                }
-                remove(name);
-                fclose(out);
-            }
-        }
-        else if (!fg && p->next == NULL){
-            if (p->ofile) {
-                char log[1024];
-                snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
-                log_output(log);
-            }
-            else{
-                char log[1024];
-                snprintf(log, 1024, "Note: the output is written in logs/%d.log\n~", p->pid);
-                log_output(log);
-            }
-        }
     }
 }
 
@@ -615,48 +477,56 @@ void assignment(string cmdline)
 {
     string var = cmdline.substr(0, cmdline.find("="));
     string value = cmdline.substr(cmdline.find("=") + 1);
-
-    if (value.find_first_not_of("0123456789") == string::npos)
+    int index = 0;
+    if ((index = value.find('$')) != string::npos)
     {
-        int tmp = stoi(value);
-        intVariables[var] = tmp;
-    }
-    else if (value.find('"') != string::npos)
-    {
-        strVariables[var] = value;
-    }
-    else
-    {
-        // cout << value << endl;
-        if (intVariables.find(value) != intVariables.end())
+        if (value[index + 1] == '(')
         {
-            intVariables[var] = intVariables[value];
+            // its a command
+            string unixcmd = value.substr(index + 2, value.find(')') - index - 2);
+            assigncmd = true;
+            job_t *tmp = readcommandline(unixcmd.c_str());
+            while (tmp)
+            {
+                int argc = tmp->first_process->argc;
+                char **argv = tmp->first_process->argv;
+                if (!builtin_cmd(tmp, argc, argv))
+                {
+                    spawn_job(tmp, !(tmp->bg));
+                }
+                tmp = tmp->next;
+            }
+
+            string output = "";
+            string line;
+            ifstream myfile;
+            myfile.open("slogs.log");
+            if (!myfile.is_open())
+            {
+                perror("Error open");
+                exit(EXIT_FAILURE);
+            }
+            while (getline(myfile, line))
+            {
+                output += line;
+            }
+            strVariables[var] = output;
+            myfile.close();
+            assigncmd = false;
         }
         else
         {
-            strVariables[var] = strVariables[value];
+            strVariables[var] = strVariables.count(value) ? strVariables[value.substr(1)] : "";
         }
     }
-}
-
-void print(string cmdline)
-{
-    string content = cmdline.substr(5);
-    if (content.find("$") != string::npos)
+    else if (value.find('"') != string::npos)
     {
-        content = content.substr(1);
-        if (intVariables.find(content) != intVariables.end())
-        {
-            cout << intVariables[content] << endl;
-        }
-        else if (strVariables.find(content) != strVariables.end())
-        {
-            cout << strVariables[content] << endl;
-        }
+        strVariables[var] = value.substr(1, value.length() - 2);
     }
     else
     {
-        cout << content << endl;
+        strVariables[var] = value;
+        // cout << "my value: " << value << endl;
     }
 }
 
@@ -689,61 +559,35 @@ int *getForLoop(string cmdline)
     return arr;
 }
 
-void add_command_to_history(const char *command) {
-    if (history_count < 100) {
-        history[history_count++] = strdup( command );
-    } else {
-        free((void*)history[0]);
-        for (unsigned index = 1; index < 100; index++) {
-            history[index - 1] = history[index];
+string parse(string cmdline)
+{
+    string res = "";
+    for (int i = 0; i < cmdline.size(); i++)
+    {
+        if (cmdline[i] == '$')
+        {
+            int tp = i;
+            while (cmdline[i] != ' ' && i < cmdline.size())
+            {
+                i++;
+            }
+            string key = cmdline.substr(tp + 1, i - tp - 1);
+            res += strVariables.count(key) ? strVariables[key] : "";
         }
-        history[99] = strdup(command);
-    }
-}
-
-void log_output(char *output) {
-    if (history_count < 100) {
-        FILE *f = fopen("output.log", "a");
-        fprintf(f, "%s\n", output);
-        fclose(f);
-    }
-    else {
-        FILE *fp, *fp2;
-        long lSize;
-        char *buffer;
-        
-        fp = fopen ("output.log", "r+" );
-        fp2 = fopen("tmp.log", "w+");
-        fseek( fp , 0L , SEEK_END);
-        lSize = ftell( fp );
-        rewind( fp );
-        
-        buffer = (char*) calloc( 1, lSize+1 );
-        
-        if( 1!=fread( buffer , lSize, 1 , fp)){
-            fclose(fp),free(buffer),fputs("3entire read fails",stderr),exit(1);
+        else
+        {
+            res.push_back(cmdline[i]);
         }
-        char * o = strtok(buffer, "~");
-        o = strtok(NULL, "~");
-        while (o != NULL) {
-            fprintf(fp2, "%s~", o);
-            o = strtok(NULL, "~");
-        }
-        fprintf(fp2, "%s\n", output);
-        int ret = rename("tmp.log", "output.log");
-        ret = remove("tmp.log");
-        fclose(fp);
-        fclose(fp2);
-        /* do your work here, buffer is a string contains the whole text */
-        free(buffer);
     }
+    cout << "parse result: " << res << endl;
+    return res;
 }
 
 int main()
 {
     init_dsh();
-    FILE *f = fopen("output.log", "w");
-    fclose(f);
+    //    DEBUG("Successfully initialized\n");
+
     while (1)
     {
         job_t *j = NULL;
@@ -774,10 +618,7 @@ int main()
                 {
                     assignment(cmdline);
                 }
-                else if (cmdline.substr(0, 5).compare("echo ") == 0)
-                {
-                    print(cmdline);
-                } // for i in range(start, end, step):
+                // for i in range(start, end, step):
                 else if (cmdline.substr(0, 3).compare("for") == 0)
                 {
                     string var = cmdline.substr(cmdline.find(" ") + 1);
@@ -786,11 +627,12 @@ int main()
                     // cout << "var: " << var << endl;
                     int *forinfo = getForLoop(cmdline);
 
-                                        int start = forinfo[0];
+                    int start = forinfo[0];
                     int end = forinfo[1];
                     int step = forinfo[2];
                     delete forinfo;
                     intVariables[var] = start;
+                    strVariables[var] = to_string(start);
 
                     string forcommand;
                     vector<string> commands;
@@ -808,25 +650,49 @@ int main()
                     }
                     for (intVariables[var] = start; intVariables[var] <= end; intVariables[var] += step)
                     {
+                        strVariables[var] = to_string(intVariables[var]);
                         for (int i = 1; i < commands.size(); i++)
                         {
                             string tcmd = commands[i];
-                            if (tcmd.substr(0, 5).compare("echo ") == 0)
-                            {
-                                print(tcmd);
-                            }
-                            else if (tcmd.find("=") != string::npos)
+                            if (tcmd.find("=") != string::npos)
                             {
                                 assignment(tcmd);
+                            }
+                            else
+                            {
+                                tcmd = parse(tcmd);
+                                job_t *tmp = readcommandline(tcmd.c_str());
+                                while (tmp)
+                                {
+                                    int argc = tmp->first_process->argc;
+                                    char **argv = tmp->first_process->argv;
+                                    if (!builtin_cmd(tmp, argc, argv))
+                                    {
+                                        spawn_job(tmp, !(tmp->bg));
+                                    }
+                                    tmp = tmp->next;
+                                }
                             }
                         }
                     }
 
                     // use for loop to exe every command
                 }
-
-                // unordered_map<string, int> intVariables;
-                // unordered_map<string, string> strVariables;
+                else
+                {
+                    cmdline = parse(cmdline);
+                    job_t *tmp = readcommandline(cmdline.c_str());
+                    while (tmp)
+                    {
+                        int argc = tmp->first_process->argc;
+                        char **argv = tmp->first_process->argv;
+                        if (!builtin_cmd(tmp, argc, argv))
+                        {
+                            spawn_job(tmp, !(tmp->bg));
+                        }
+                        tmp = tmp->next;
+                    }
+                }
             }
             free(j->commandinfo);
             free(j);
@@ -854,14 +720,6 @@ int main()
             {
                 spawn_job(j, !(j->bg));
             }
-            char name[65536];
-            strcat(name, strtok(j->commandinfo, "\n"));
-            if (j->bg) {
-                strcat(name, "&");
-            }
-            printf("%s\n", name);
-            add_command_to_history(name);
-            memset(name, 0, 65536);
             j = j->next;
         }
     }
