@@ -19,7 +19,6 @@ unordered_map<string, string> strVariables;
 
 job_t *job_list = NULL; // first job
 bool assigncmd = false;
-bool interactive_shell = false;
 
 static const int PIPE_READ = 0;
 static const int PIPE_WRITE = 1;
@@ -579,7 +578,7 @@ void spawn_job(job_t *j, bool fg)
         close(prev_pipe[PIPE_WRITE]);
 
         parent_wait(j, fg);
-        if (fg && p->next == NULL && !interactive_shell){
+        if (fg && p->next == NULL){
             if (p->ofile) {}
             else{
                 char name[20];
@@ -607,7 +606,7 @@ void spawn_job(job_t *j, bool fg)
                 fclose(out);
             }
         }
-        else if (!fg && p->next == NULL && !interactive_shell){
+        else if (!fg && p->next == NULL){
             if (p->ofile) {
                 char log[1024];
                 snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
@@ -804,7 +803,6 @@ int main()
 
         if (strcmp(j->commandinfo, "shell") == 0)
         {
-            interactive_shell = true;
             while (1)
             {
                 string cmdline;
@@ -896,7 +894,6 @@ int main()
             }
             free(j->commandinfo);
             free(j);
-            interactive_shell = false;
             continue;
         }
 
