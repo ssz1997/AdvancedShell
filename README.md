@@ -155,20 +155,82 @@ you test your shell.
 
 # EXTENDING
 ## Interactive bash scripter
-Next, we created an interactive bash scripter that allows users to execute interactive computing tasks such as function declaration using variables, for loop, and some related functions. All declared functions and variables should be preserved throughout the session unless specified by users otherwise. Bash scripter can help system administrators automate things by using a loop to execute repetitive tasks. On a large system, this would save tons of time.
-In order to create a shell environment, we will first try to catch the command info and see if the command is “shell”, and once the shell command has been called, we will first create a while loop that keeps reading the new line from the stdin until “exit” has been called.
-To perform the variable declaration, we create a hashmap to store the variable and its assigned value, and once the incoming command contains the ‘=’ sign, we will separate the input string and put the corresponding key-value pair into the unordered map for further operations.
-One function we realized could be helpful is doing mathematical operations, so we decide to add a simple arithmetic function into our shell, in which if the normal addition or subtraction is typed into the shell, the user can get the result immediately, and the user can also perform assignment operations with it. For example, we can do “var=(1+2)-3”, and when we try to echo $var, the output would be 0 because the value has been calculated directly. 
-In this function, we use some algorithm to first parse the incoming command line and transfer any variable ($var) into the value it has, and then we perform the calculation by using stack and flag. Therefore, we are able to perform a long string of calculations such as (4-3) + 1 + 2, etc.
-Another interesting function for a shell to have is to allow the variable to contain the result of their Unix operation. For example, if we perform var = $(pwd), then var would contain the result of “pwd” such as “/home/project”, and after that when we perform echo $var, “/home/project” would be printed into the shell without actually performing “pwd” again.
-Specifically, in this function, we would first check whether the value is a Unix operation, and we would process the command and pass them into the original spawn_job function. However, when we declare a variable, we don’t really want the operation to print out their output into the terminal/shell, so we decided to use a flag to clarify the assignment operation and save the output into our local hashmap. Specifically, since the STDOUT_FILENO is essentially a file descriptor, we would first use dup2 to switch the file descriptor into a local log file, and then the spawn_job finish, we would first read the output from the log file and assign the output as the value and create a new key-value pair and store them.
-One of the most important functions is for loop. In our program, we would use strict bash syntax( for i in {1..4}) to perform for loop operation, we would first check whether the command line contains the for-loop’s keyword, and once we assure this is a for loop, we would first extract the start, end, and step number from the command line. and we would keep getting a new line from the coming command lines and store all the operations into a vector, and once the keyword “done” appears, we would break the getline’s while loop and perform for loop operations by traversing the commands vector using the start, end, and step numbers.
-By using the for loop, we can perform Unix operations repetitively and storing the variable declarations’ results, and it can make our interactive shell extremely useful. Specifically, we can first type “for i in {1..5}”, and then type “do”, and “echo 1”, and “done”, and the shell would print 1 five times, and so does any other operation.
+Next, we created an interactive bash scripter that allows users to execute 
+interactive computing tasks such as function declaration using variables, 
+for loop, and some related functions. All declared functions and variables 
+should be preserved throughout the session unless specified by users otherwise. 
+Bash scripter can help system administrators automate things by using a loop 
+to execute repetitive tasks. On a large system, this would save tons of time.
+
+In order to create a shell environment, we will first try to catch the command
+info and see if the command is “shell”, and once the shell command has been
+called, we will first create a while loop that keeps reading the new line from
+the stdin until “exit” has been called.
+
+To perform the variable declaration, we create a hashmap to store the variable
+and its assigned value, and once the incoming command contains the ‘=’ sign,
+we will separate the input string and put the corresponding key-value pair into the unordered map for further operations.
+
+One function we realized could be helpful is doing mathematical operations,
+so we decide to add a simple arithmetic function into our shell, in which if
+the normal addition or subtraction is typed into the shell, the user can get
+the result immediately, and the user can also perform assignment operations
+with it. For example, we can do “var=(1+2)-3”, and when we try to echo $var,
+the output would be 0 because the value has been calculated directly. 
+
+In this function, we use some algorithm to first parse the incoming command
+line and transfer any variable ($var) into the value it has, and then we
+perform the calculation by using stack and flag. Therefore, we are able to
+perform a long string of calculations such as (4-3) + 1 + 2, etc.
+
+Another interesting function for a shell to have is to allow the variable to
+contain the result of their Unix operation. For example, if we perform
+var = $(pwd), then var would contain the result of “pwd” such as “/home/project”,
+and after that when we perform echo $var, “/home/project” would be printed into
+the shell without actually performing “pwd” again.
+
+Specifically, in this function, we would first check whether the value is a Unix
+operation, and we would process the command and pass them into the original spawn_job
+function. However, when we declare a variable, we don’t really want the operation
+to print out their output into the terminal/shell, so we decided to use a flag to
+clarify the assignment operation and save the output into our local hashmap.
+Specifically, since the STDOUT_FILENO is essentially a file descriptor, we would
+first use dup2 to switch the file descriptor into a local log file, and then the
+spawn_job finish, we would first read the output from the log file and assign the
+output as the value and create a new key-value pair and store them.
+
+One of the most important functions is for loop. In our program, we would use strict
+bash syntax( for i in {1..4}) to perform for loop operation, we would first check
+whether the command line contains the for-loop’s keyword, and once we assure this
+is a for loop, we would first extract the start, end, and step number from the command
+line. and we would keep getting a new line from the coming command lines and store all
+the operations into a vector, and once the keyword “done” appears, we would break the
+getline’s while loop and perform for loop operations by traversing the commands vector
+using the start, end, and step numbers.
+
+By using the for loop, we can perform Unix operations repetitively and storing the
+variable declarations’ results, and it can make our interactive shell extremely useful.
+Specifically, we can first type “for i in {1..5}”, and then type “do”, and “echo 1”,
+and “done”, and the shell would print 1 five times, and so does any other operation.
+
 ## History
-Furthermore, we created history/logging functionality. The user is then able to trace back what commands have been executed and what are the results, including stdout, stderr, and the output redirection. Therefore, instead of having to scroll back and forth to find the output of a particular command, now the user is able to easily find the index of that command and then find its corresponding output. By calling “history”, we show the most recent 100 commands that were run. And by calling “history i”, where i is the index of the command that is indicated in the “history” call. A background job is different from a typical Unix shell. The output is not directly printed in the terminal but will be directed to its corresponding and unique file. We think it kind of makes sense that the output of the background job does not out and interfere with the foreground job output if there is any. 
+Furthermore, we created history/logging functionality. The user is then able to trace
+back what commands have been executed and what are the results, including stdout, stderr,
+and the output redirection. Therefore, instead of having to scroll back and forth to find
+the output of a particular command, now the user is able to easily find the index of that
+command and then find its corresponding output. By calling “history”, we show the most
+recent 100 commands that were run. And by calling “history i”, where i is the index of
+the command that is indicated in the “history” call. A background job is different from
+a typical Unix shell. The output is not directly printed in the terminal but will be
+directed to its corresponding and unique file. We think it kind of makes sense that
+the output of the background job does not out and interfere with the foreground job output if there is any. 
+
 After the command is parsed and the job is created, the command is stored in the memory. The array has a size of 100 and thus we can store the most recent 100 commands. By calling “history”, we iterate through the array and print saved commands to the console with their id starting from 1. 
+
 To store the output of a command, we need to consider foreground jobs and background jobs separately. For foreground jobs, similar to what we do in the interactive bash shell, instead of outputting the results to the screen, we call dup2 and direct the output to a file. When the process is finished, function parent_wait would return and then look at the file, identified by its process number, and then print it to the screen, and at the same time storing what it prints to our log file called output.log, where all the outputs are stored. In other words, we add another layer between the process and the terminal, in which we intercept the output, store it, and then print it out. We delete the file after we are done reading it, so we won’t use too much memory. 
+
 For background jobs, we wanted to print everything to the console, like a real Unix shell. However, if we want to at the same time store the outputs, we either directly read from the console, which is not practical, or save it to some other files, like what we do for the foreground jobs. But to output them to the console, we need to know when there is stuff or new stuff, we could print, and for a background job we have no idea when it stops or generates any output, unlike foreground jobs. Therefore, the only way is to not actually print the outputs to the shell, and that actually makes some sense, as we said previously, the output of a background job should not interfere with other stuff. The reason we want to run something in the background is that we want to run other stuff in the foreground and if their outputs are mixed together and we cannot figure out which is which, it could bring issues. Therefore, we call dup2 to redirect the output into its corresponding and unique file identified by the process id and let the output file, output.log, write down where the output is. When the user wants to look at the output, the output file would let him/her know where to find it.
+
 Now as we have all the outputs of the jobs, by calling “history i”, where i is the index of the command indicated in the command history array
 
 
