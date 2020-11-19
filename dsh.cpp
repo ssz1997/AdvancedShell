@@ -44,9 +44,6 @@ int *getForLoop(string cmdline);
 void add_command_to_history(const char *command);
 void log_output(char *output);
 
-int calculate(string cmdline);
-bool isArithmetic(string cmdline);
-
 job_t *search_job(int jid)
 {
     job_t *job = job_list;
@@ -132,7 +129,7 @@ void redirect(process_t *p)
 
     if (p->ofile)
     {
-        char *name = p->ofile;
+        char * name = p->ofile;
         strtok(name, "\n");
         int fd = creat(name, 0644);
         if (fd >= 0)
@@ -166,8 +163,8 @@ void new_child(job_t *j, process_t *p, bool fg)
     /* also establish child process group in child to avoid race (if parent has not done it yet). */
     set_pgid(j, p);
 
-    if (fg && isatty(STDIN_FILENO)) // if fg is set
-        seize_tty(j->pgid);         // assign the terminal
+    if (fg && isatty(STDIN_FILENO))                 // if fg is set
+        seize_tty(j->pgid); // assign the terminal
 
     /* Set the handling for job control signals back to the default. */
     signal(SIGINT, SIG_DFL);
@@ -312,56 +309,48 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         print_jobs();
         return true;
     }
-    else if (!strcmp("history", argv[0]))
-    {
-        if (argc == 1)
-        {
+    else if (!strcmp("history", argv[0])) {
+        if (argc == 1) {
             char buffer[1024];
             char *target = buffer;
-            if (history_count == 0)
-            {
+            if (history_count == 0) {
                 printf("No commands ever ran in this session.");
                 strcat(buffer, "No commands ever ran in this session.\n~");
                 log_output(buffer);
                 return true;
             }
-            for (int i = 0; i < history_count; i++)
-            {
-                printf("%d: %s\n", i + 1, history[i]);
-                target += sprintf(target, "%d: %s\n", i + 1, history[i]);
+            for (int i = 0; i < history_count; i++) {
+                printf("%d: %s\n", i+1, history[i]);
+                target += sprintf(target, "%d: %s\n", i+1, history[i]);
             }
             target += sprintf(target, "~");
             log_output(buffer);
             return true;
         }
-        else
-        {
-            int index = atoi(argv[1]); // unsafe
-            FILE *fp = fopen("output.log", "r+");
+        else {
+            int index = atoi(argv[1]);    // unsafe
+            FILE *fp = fopen ("output.log", "r+" );
             fseek(fp, 0L, SEEK_END);
             int lSize = ftell(fp);
             rewind(fp);
-
-            char *buffer = (char *)calloc(1, lSize + 1);
-
-            if (1 != fread(buffer, lSize, 1, fp))
-            {
-                fclose(fp), free(buffer), fputs("entire read fails", stderr), exit(1);
+            
+            char *buffer = (char*) calloc( 1, lSize+1 );
+            
+            if( 1!=fread(buffer, lSize, 1, fp)){
+                fclose(fp),free(buffer),fputs("entire read fails",stderr),exit(1);
             }
-            char *o = strtok(buffer, "~");
+            char * o = strtok(buffer, "~");
             int count = 1;
-            while (count < index)
-            {
+            while (count < index) {
                 o = strtok(NULL, "~");
                 //printf("count: %d, o: %s\n", count, o);
-                count++;
+                count ++;
             }
             printf("Output:\n");
             char *oo = strtok(o, "\n");
             char output_buffer[1024];
             strcat(output_buffer, "Output:\n");
-            while (oo != NULL)
-            {
+            while (oo != NULL) {
                 printf("\t%s\n", oo);
                 strcat(output_buffer, "\t");
                 strcat(output_buffer, oo);
@@ -471,9 +460,10 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         fflush(stdout);
         continue_job(job);
         job->bg = false;
-
+        
         if (isatty(STDIN_FILENO))
             seize_tty(job->pgid);
+        
 
         parent_wait(job, true);
         return true;
@@ -512,6 +502,7 @@ void spawn_job(job_t *j, bool fg)
 
             set_pgid(j, p);
 
+
             if (p != j->first_process)
             {
                 close(prev_pipe[PIPE_WRITE]);
@@ -523,6 +514,7 @@ void spawn_job(job_t *j, bool fg)
                 close(next_pipe[PIPE_READ]);
                 dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
                 close(next_pipe[PIPE_WRITE]);
+
             }
             else
             {
@@ -532,17 +524,14 @@ void spawn_job(job_t *j, bool fg)
                     dup2(log, STDOUT_FILENO);
                     close(log);
                 }
-                else
-                {
-                    if (p->ofile)
-                    {
+                else {
+                    if (p->ofile) {
                         dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
                         char log[1024];
                         snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
                         log_output(log);
                     }
-                    else
-                    {
+                    else {
                         char name[20];
                         snprintf(name, 20, "logs/%d.log", p->pid);
                         int log = creat(name, 0644);
@@ -551,7 +540,7 @@ void spawn_job(job_t *j, bool fg)
                         close(log);
                     }
                 }
-
+                
                 close(next_pipe[PIPE_READ]);
                 close(next_pipe[PIPE_WRITE]);
             }
@@ -589,51 +578,41 @@ void spawn_job(job_t *j, bool fg)
         close(prev_pipe[PIPE_WRITE]);
 
         parent_wait(j, fg);
-        if (fg && p->next == NULL)
-        {
-            if (p->ofile)
-            {
-            }
-            else
-            {
+        if (fg && p->next == NULL && !assigncmd){
+            if (p->ofile) {}
+            else{
                 char name[20];
                 snprintf(name, 20, "logs/%d.log", p->pid);
                 FILE *out = fopen(name, "r+");
                 fseek(out, 0, SEEK_END);
                 int lSize = ftell(out);
                 rewind(out);
-                if (lSize != 0)
-                {
-                    char *buffer = (char *)calloc(1, lSize + 1);
-                    if (1 != fread(buffer, lSize, 1, out))
-                    {
-                        fclose(out), free(buffer), fputs("entire read fails", stderr), exit(1);
+                if (lSize != 0) {
+                    char *buffer = (char*)calloc( 1, lSize+1 );
+                    if( 1!=fread(buffer, lSize, 1, out)){
+                        fclose(out),free(buffer),fputs("entire read fails",stderr),exit(1);
                     }
                     printf("%s\n", buffer);
                     strcat(buffer, "~");
                     log_output(buffer);
                 }
-                else
-                {
+                else {
                     char buffer[1024];
                     snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
                     log_output(buffer);
-                    printf("%s: Command not found.", p->argv[0]);
+                    printf("%s: Command not found.\n", p->argv[0]);
                 }
                 remove(name);
                 fclose(out);
             }
         }
-        else if (!fg && p->next == NULL)
-        {
-            if (p->ofile)
-            {
+        else if (!fg && p->next == NULL && !assigncmd){
+            if (p->ofile) {
                 char log[1024];
                 snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
                 log_output(log);
             }
-            else
-            {
+            else{
                 char log[1024];
                 snprintf(log, 1024, "Note: the output is written in logs/%d.log\n~", p->pid);
                 log_output(log);
@@ -665,7 +644,7 @@ void assignment(string cmdline)
                 }
                 tmp = tmp->next;
             }
-
+            
             string output = "";
             string line;
             ifstream myfile;
@@ -698,6 +677,7 @@ void assignment(string cmdline)
         // cout << "my value: " << value << endl;
     }
 }
+
 
 int *getForLoop(string cmdline)
 {
@@ -748,57 +728,47 @@ string parse(string cmdline)
             res.push_back(cmdline[i]);
         }
     }
-    // cout << "parse result: " << res << endl;
+    cout << "parse result: " << res << endl;
     return res;
 }
 
-void add_command_to_history(const char *command)
-{
-    if (history_count < 100)
-    {
-        history[history_count++] = strdup(command);
-    }
-    else
-    {
-        free((void *)history[0]);
-        for (unsigned index = 1; index < 100; index++)
-        {
+void add_command_to_history(const char *command) {
+    if (history_count < 100) {
+        history[history_count++] = strdup( command );
+    } else {
+        free((void*)history[0]);
+        for (unsigned index = 1; index < 100; index++) {
             history[index - 1] = history[index];
         }
         history[99] = strdup(command);
     }
 }
 
-void log_output(char *output)
-{
-    if (history_count < 100)
-    {
+void log_output(char *output) {
+    if (history_count < 100) {
         FILE *f = fopen("output.log", "a");
         fprintf(f, "%s\n", output);
         fclose(f);
     }
-    else
-    {
+    else {
         FILE *fp, *fp2;
         long lSize;
         char *buffer;
-
-        fp = fopen("output.log", "r+");
+        
+        fp = fopen ("output.log", "r+" );
         fp2 = fopen("tmp.log", "w+");
-        fseek(fp, 0L, SEEK_END);
-        lSize = ftell(fp);
-        rewind(fp);
-
-        buffer = (char *)calloc(1, lSize + 1);
-
-        if (1 != fread(buffer, lSize, 1, fp))
-        {
-            fclose(fp), free(buffer), fputs("3entire read fails", stderr), exit(1);
+        fseek( fp , 0L , SEEK_END);
+        lSize = ftell( fp );
+        rewind( fp );
+        
+        buffer = (char*) calloc( 1, lSize+1 );
+        
+        if( 1!=fread( buffer , lSize, 1 , fp)){
+            fclose(fp),free(buffer),fputs("3entire read fails",stderr),exit(1);
         }
-        char *o = strtok(buffer, "~");
+        char * o = strtok(buffer, "~");
         o = strtok(NULL, "~");
-        while (o != NULL)
-        {
+        while (o != NULL) {
             fprintf(fp2, "%s~", o);
             o = strtok(NULL, "~");
         }
@@ -810,58 +780,6 @@ void log_output(char *output)
         /* do your work here, buffer is a string contains the whole text */
         free(buffer);
     }
-}
-
-bool isArithmetic(string cmdline)
-{
-    return cmdline.find('+') != string::npos || cmdline.find('-') != string::npos;
-}
-
-int calculate(string cmdline)
-{
-    vector<int> st;
-    int tmp = 0;
-    int result = 0;
-    int symbol = 1;
-
-    for (int i = 0; i < cmdline.size(); i++)
-    {
-        char s = cmdline[i];
-        if (s >= '0' && s <= '9')
-        {
-            tmp = 10 * tmp + s - '0';
-        }
-        else if (s == '+')
-        {
-            result += symbol * tmp;
-            symbol = 1;
-            tmp = 0;
-        }
-        else if (s == '-')
-        {
-            result += symbol * tmp;
-            symbol = -1;
-            tmp = 0;
-        }
-        else if (s == '(')
-        {
-            st.push_back(result);
-            st.push_back(symbol);
-            symbol = 1;
-            result = 0;
-        }
-        else if (s == ')')
-        {
-            result += symbol * tmp;
-            result *= st.back();
-            st.pop_back(); // remove sign
-            result += st.back();
-            st.pop_back(); // add previous values
-            tmp = 0;
-        }
-    }
-
-    return result + (symbol * tmp);
 }
 
 int main()
@@ -894,22 +812,6 @@ int main()
                 if (cmdline.compare("exit") == 0)
                 {
                     break;
-                }
-                else if (isArithmetic(cmdline))
-                {
-                    cmdline = parse(cmdline);
-                    int ans = 0;
-                    if (cmdline.find('=') != string::npos)
-                    {
-                        ans = calculate(cmdline.substr(cmdline.find("=") + 1));
-                        string key = cmdline.substr(0, cmdline.find("="));
-                        assignment(key + "=" + to_string(ans));
-                    }
-                    else
-                    {
-                        ans = calculate(cmdline);
-                    }
-                    cout << ans << endl;
                 }
                 else if (cmdline.find("=") != string::npos)
                 {
@@ -953,22 +855,6 @@ int main()
                             if (tcmd.find("=") != string::npos)
                             {
                                 assignment(tcmd);
-                            }
-                            else if (isArithmetic(tcmd))
-                            {
-                                tcmd = parse(tcmd);
-                                int ans = 0;
-                                if (tcmd.find('=') != string::npos)
-                                {
-                                    ans = calculate(tcmd.substr(tcmd.find("=") + 1));
-                                    string key = tcmd.substr(0, tcmd.find("="));
-                                    assignment(key + "=" + to_string(ans));
-                                }
-                                else
-                                {
-                                    ans = calculate(tcmd);
-                                }
-                                cout << ans << endl;
                             }
                             else
                             {
@@ -1034,8 +920,7 @@ int main()
             }
             char name[65536];
             strcat(name, strtok(j->commandinfo, "\n"));
-            if (j->bg)
-            {
+            if (j->bg) {
                 strcat(name, "&");
             }
             add_command_to_history(name);
