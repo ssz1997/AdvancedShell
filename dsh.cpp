@@ -213,15 +213,6 @@ int parent_wait(job_t *j, int fg)
             if (WIFEXITED(status))
             {
                 p->completed = true;
-                if (status == EXIT_SUCCESS)
-                {
-                    printf("%d (Completed): %s\n", pid, p->argv[0]);
-                }
-                else
-                {
-                    printf("%d (Failed): %s\n", pid, p->argv[0]);
-                }
-                //fflush(stdout);
             }
             else if (WIFSTOPPED(status))
             {
@@ -318,7 +309,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         return true;
     }
     else if (!strcmp("history", argv[0]) && !interactive_shell)
-    {
+    {   
         if (argc == 1)
         {
             char buffer[1024];
@@ -339,7 +330,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
             log_output(buffer);
             return true;
         }
-        else
+	else if (argc == 2)
         {
             int index = atoi(argv[1]); // unsafe
             FILE *fp = fopen("output.log", "r+");
@@ -361,10 +352,10 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
                 //printf("count: %d, o: %s\n", count, o);
                 count++;
             }
-            printf("Output:\n");
             char *oo = strtok(o, "\n");
-            char output_buffer[1024];
+            char output_buffer[1024] = {0};
             strcat(output_buffer, "Output:\n");
+	    printf("%s\n", output_buffer);
             while (oo != NULL)
             {
                 printf("\t%s\n", oo);
@@ -725,7 +716,7 @@ void assignment(string cmdline)
         }
         else
         {
-            // cout << "test" << endl;
+            cout << "test" << endl;
             strVariables[var] = strVariables.count(value.substr(1)) ? strVariables[value.substr(1)] : "";
         }
     }
@@ -794,7 +785,7 @@ string parse(string cmdline)
             res.push_back(cmdline[i]);
         }
     }
-    // cout << "parse result: " << res << endl;
+    cout << "parse result: " << res << endl;
     return res;
 }
 
@@ -940,8 +931,6 @@ int main()
                 getline(cin, cmdline);
                 if (cmdline.compare("exit") == 0)
                 {
-                    intVariables.clear();
-                    strVariables.clear();
                     break;
                 }
                 else if (isArithmetic(cmdline))
@@ -952,7 +941,7 @@ int main()
                     {
                         ans = calculate(cmdline.substr(cmdline.find("=") + 1));
                         string key = cmdline.substr(0, cmdline.find("="));
-                        // cout << key << ans << endl;
+                        cout << key << ans << endl;
                         assignment(key + "=" + to_string(ans));
                     }
                     else
@@ -1038,7 +1027,7 @@ int main()
                             }
                         }
                     }
-                    commands.clear();
+
                     // use for loop to exe every command
                 }
                 else
