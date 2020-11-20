@@ -8,6 +8,8 @@
 #include <vector>
 #include <stdarg.h>
 #include <fstream>
+#include <stdio.h>
+#include <stdlib.h>
 
 using namespace std;
 static char prompt_head[20];
@@ -33,7 +35,7 @@ int set_pgid(job_t *j, process_t *p);                     // set pgid for a job
 void new_child(job_t *j, process_t *p, bool fg);          // create context for new child process
 void continue_job(job_t *j);                              // continue a stopped job
 char *promptmsg();                                        // heading
-void parent_wait(job_t *j, int fg);                       // parent wait for child to finish
+int parent_wait(job_t *j, int fg);                       // parent wait for child to finish
 void print_jobs();                                        // print jobs in the list
 bool builtin_cmd(job_t *last_job, int argc, char **argv); // execute built-in cmd
 void spawn_job(job_t *j, bool fg);                        // spawn a new job
@@ -44,6 +46,7 @@ int *getForLoop(string cmdline);
 void add_command_to_history(const char *command);
 void log_output(char *output);
 
+bool interactive_shell;
 int calculate(string cmdline);
 bool isArithmetic(string cmdline);
 
@@ -199,7 +202,7 @@ char *promptmsg()
     return prompt_head;
 }
 
-void parent_wait(job_t *j, int fg)
+int parent_wait(job_t *j, int fg)
 {
     if (fg)
     {
@@ -224,7 +227,6 @@ void parent_wait(job_t *j, int fg)
             {
                 if (kill(-j->pgid, SIGSTOP) < 0)
                 {
-                    //                    logger(STDERR_FILENO,"Kill (SIGSTOP) failed.");
                     printf("Kill SIGSTOP failed");
                 }
                 p->stopped = true;
@@ -247,7 +249,9 @@ void parent_wait(job_t *j, int fg)
                 break;
             }
         }
+        return pid;
     }
+    return -1;
 }
 
 void print_jobs()
@@ -302,6 +306,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
 
     if (!strcmp(argv[0], "quit"))
     {
+        system("exec rm -r logs/*");
         exit(EXIT_SUCCESS);
     }
     else if (!strcmp("jobs", argv[0]))
@@ -309,7 +314,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         print_jobs();
         return true;
     }
-    else if (!strcmp("history", argv[0]))
+    else if (!strcmp("history", argv[0]) && !interactive_shell)
     {
         if (argc == 1)
         {
@@ -394,25 +399,25 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         if (argc != 2 || !(position = atoi(argv[1])))
         {
             printf("%d %d", position, argc);
-            printf("Error: invalid arguments for bg command");
+            printf("Error: invalid arguments for bg command\n");
             log_output("Error: invalid arguments for bg command\n~");
             return true;
         }
         if (!(job = search_job_pos(position)))
         {
             printf("%d %d", position, argc);
-            printf("Error: Could not find requested job");
-            log_output("Error: Could not find requested job");
+            printf("Error: Could not find requested job\n");
+            log_output("Error: Could not find requested job\n~");
             return true;
         }
         if (job_is_completed(job))
         {
-            printf("Error: this job is already completed.");
-            log_output("Error: this job is already completed.");
+            printf("Error: this job is already completed.\n");
+            log_output("Error: this job is already completed.\n~");
             return true;
         }
         char log[1024];
-        char *target = log;
+        snprintf(log,1024,  "#Sending job '%s' to background\n~", job->commandinfo);
         log_output(log);
         printf("#Sending job '%s' to background\n", job->commandinfo);
         fflush(stdout);
@@ -438,31 +443,31 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         {
             if (!(job = search_job_pos(pos)))
             {
-                printf("Error: Could not find requested job");
-                log_output("Error: Could not find requested job");
+                printf("Error: Could not find requested job\n");
+                log_output("Error: Could not find requested job\n~");
                 return true;
             }
             if (job->notified == false)
             {
-                printf("Error: Could not find requested job");
-                log_output("Error: Could not find requested job");
+                printf("Error: Could not find requested job\n");
+                log_output("Error: Could not find requested job\n~");
                 return true;
             }
             if (job_is_completed(job))
             {
-                printf("Error: this job is already completed.");
-                log_output("Error: this job is already completed.");
+                printf("Error: this job is already completed.\n");
+                log_output("Error: this job is already completed.\n~");
                 return true;
             }
         }
         else
         {
-            printf("Error: invalid arguments for fg command");
+            printf("Error: invalid arguments for fg command\n");
             log_output("Error: invalid arguments for fg command\n~");
             return true;
         }
         char log[1024];
-        char *target = log;
+        snprintf(log,1024,  "#Sending job '%s' to foreground\n~", job->commandinfo);
         log_output(log);
         printf("#Bringing job '%s' to foreground\n", job->commandinfo);
         fflush(stdout);
@@ -472,7 +477,43 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         if (isatty(STDIN_FILENO))
             seize_tty(job->pgid);
 
-        parent_wait(job, true);
+        int pid = parent_wait(job, true);
+	printf("%d\n", pid);
+        process_t *p = getProcess(pid);
+        if (p->next == NULL && !assigncmd)
+        {
+            if (p->ofile)
+            {
+            }
+            else
+            {
+                char name[20];
+                snprintf(name, 20, "logs/%d.log", p->pid);
+                FILE *out = fopen(name, "r+");
+                fseek(out, 0, SEEK_END);
+                int lSize = ftell(out);
+                rewind(out);
+                if (lSize != 0)
+                {
+                    char *buffer = (char *)calloc(1, lSize + 1);
+                    if (1 != fread(buffer, lSize, 1, out))
+                    {
+                        fclose(out), free(buffer), fputs("entire read fails", stderr), exit(1);
+                    }
+                    printf("%s\n", buffer);
+                    strcat(buffer, "~");
+                    log_output(buffer);
+                }
+                else
+                {
+                    char buffer[1024];
+                    snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
+                    log_output(buffer);
+                    printf("%s: Command not found.\n", p->argv[0]);
+                }
+                fclose(out);
+            }
+        }
         return true;
     }
     return false; /* not a builtin command */
@@ -617,7 +658,6 @@ void spawn_job(job_t *j, bool fg)
                     log_output(buffer);
                     printf("%s: Command not found.\n", p->argv[0]);
                 }
-                remove(name);
                 fclose(out);
             }
         }
@@ -888,6 +928,7 @@ int main()
 
         if (strcmp(j->commandinfo, "shell") == 0)
         {
+            interactive_shell = true;
             while (1)
             {
                 string cmdline;
@@ -1013,6 +1054,7 @@ int main()
             }
             free(j->commandinfo);
             free(j);
+            interactive_shell = false;
             continue;
         }
 
