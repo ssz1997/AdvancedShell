@@ -96,7 +96,7 @@ job_t *search_job_pos(int pos)
     {
         if (count == 1)
         {
-            printf("job find\n");
+//            printf("job find\n");
             return job;
         }
         if (job->next == NULL)
@@ -384,6 +384,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
             char output_buffer[1024] = {0};
             strcat(output_buffer, "Output:\n");
             printf("%s\n", output_buffer);
+
             while (oo != NULL)
             {
                 printf("\t%s\n", oo);
