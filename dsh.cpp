@@ -50,6 +50,32 @@ bool interactive_shell;
 int calculate(string cmdline);
 bool isArithmetic(string cmdline);
 
+bool free_job(job_t *j);
+
+void remove_finished_jobs() {
+    job_t *job = job_list;
+    job_t *prev_job = NULL;
+    while (job != NULL) {
+        if (job_is_completed(job)) {
+            if (job == job_list) {
+//                if(!free_job(job))
+                job_list = job_list -> next;
+                free_job(job);
+                job = job_list;
+            } else {
+                prev_job -> next = job -> next;
+                free(job);
+                job = prev_job -> next;
+            }
+
+        }
+        else {
+            prev_job = job;
+            job = job -> next;
+        }
+    }
+}
+
 job_t *search_job(int jid)
 {
     job_t *job = job_list;
@@ -70,6 +96,7 @@ job_t *search_job_pos(int pos)
     {
         if (count == 1)
         {
+	    printf("job find\n");
             return job;
         }
         if (job->next == NULL)
@@ -248,8 +275,9 @@ int parent_wait(job_t *j, int fg)
 void print_jobs()
 {
     int count = 1;
+    remove_finished_jobs();
     job_t *j = job_list;
-    
+
     if (j == NULL)
     {
         return;
@@ -309,7 +337,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         return true;
     }
     else if (!strcmp("history", argv[0]) && !interactive_shell)
-    {   
+    {
         if (argc == 1)
         {
             char buffer[1024];
@@ -392,14 +420,14 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         job_t *job;
         if (argc != 2 || !(position = atoi(argv[1])))
         {
-            printf("%d %d", position, argc);
+//            printf("%d %d", position, argc);
             printf("Error: invalid arguments for bg command\n");
             log_output("Error: invalid arguments for bg command\n~");
             return true;
         }
         if (!(job = search_job_pos(position)))
         {
-            printf("%d %d", position, argc);
+//            printf("%d %d", position, argc);
             printf("Error: Could not find requested job\n");
             log_output("Error: Could not find requested job\n~");
             return true;
@@ -431,6 +459,11 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         if (argc == 1)
         {
             job = search_job_pos(-1);
+            if (!job) {
+                printf("Error: No job in job list\n");
+                log_output("Error: No job in job list\n~");
+                return true;
+            }
         }
         //right arguments given, find respective job
         else if (argc == 2 && (pos = atoi(argv[1])))
@@ -441,7 +474,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
                 log_output("Error: Could not find requested job\n~");
                 return true;
             }
-            if (job->notified == false)
+            if (job->notified)
             {
                 printf("Error: Could not find requested job\n");
                 log_output("Error: Could not find requested job\n~");
@@ -517,7 +550,6 @@ void spawn_job(job_t *j, bool fg)
 {
     pid_t pid;
     process_t *p;
-    job_list = NULL;
     addJob(j);
     int prev_pipe[2];
 

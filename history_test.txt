@@ -1,0 +1,53 @@
+Section 3: History Function Test
+(1) 
+    pwd
+    history
+    history
+
+    You will see the following output:
+
+    *current path*
+
+    1: pwd
+
+    1: pwd
+    2: history
+
+    This is correct because the history command should print out previous commands. Here the first history should print the first command, and the second history should print the first command plus the second command, which is a history
+
+
+(2)
+    pwd
+    history 1
+
+    You will see the following output:
+
+    /cps510/compsci310-fall20/AdvancedShell
+
+    Output: 
+	    
+	    *current path*
+
+    This is correct because history index should print the output of that command with the specified index, in this case, the current path.
+
+(3) pwd > a.txt
+    history 1
+
+    You will see the following output:
+
+    Output: 
+	    
+	    Command output is redirected to a.txt
+
+    This is correct because when the job has io redirection, we don't need to go to that file and put the output into our record.
+
+(4) ping google.com &
+    history 1
+
+    You will see the following output:
+
+    Output:
+
+	Note: the output is written in logs/27.log
+
+    This is correct because we are storing the output of a background job in a file, whose path is logs/pid.log
