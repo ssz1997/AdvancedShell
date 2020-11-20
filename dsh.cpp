@@ -725,7 +725,7 @@ void assignment(string cmdline)
         }
         else
         {
-            cout << "test" << endl;
+            // cout << "test" << endl;
             strVariables[var] = strVariables.count(value.substr(1)) ? strVariables[value.substr(1)] : "";
         }
     }
@@ -794,7 +794,7 @@ string parse(string cmdline)
             res.push_back(cmdline[i]);
         }
     }
-    cout << "parse result: " << res << endl;
+    // cout << "parse result: " << res << endl;
     return res;
 }
 
@@ -950,7 +950,7 @@ int main()
                     {
                         ans = calculate(cmdline.substr(cmdline.find("=") + 1));
                         string key = cmdline.substr(0, cmdline.find("="));
-                        cout << key << ans << endl;
+                        // cout << key << ans << endl;
                         assignment(key + "=" + to_string(ans));
                     }
                     else
