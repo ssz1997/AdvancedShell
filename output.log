@@ -1,6 +1,72 @@
-1
+Makefile
+README.md
+a.txt
+dsh
+dsh.cpp
+dsh.h
+fork-examples
+helper.cpp
+history_test.txt
+logs
+output.log
+parse.cpp
+slogs.log
+test.py
+tests.bash
 ~
-3
+Note: the output is written in logs/383.log
 ~
-5
+ bg  Running        ping google.com 
+~
+Makefile
+README.md
+a.txt
+dsh
+dsh.cpp
+dsh.h
+fork-examples
+helper.cpp
+history_test.txt
+logs
+output.log
+parse.cpp
+slogs.log
+test.py
+tests.bash
+~
+ bg  Running        ping google.com 
+~
+#Sending job 'ping google.com ' to foreground
+~
+PING google.com (172.217.2.110) 56(84) bytes of data.
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=1 ttl=37 time=21.6 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=2 ttl=37 time=113 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=3 ttl=37 time=87.2 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=4 ttl=37 time=135 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=5 ttl=37 time=188 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=6 ttl=37 time=280 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=7 ttl=37 time=37.7 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=8 ttl=37 time=20.9 ms
+64 bytes from iad23s72-in-f14.1e100.net (172.217.2.110): icmp_seq=9 ttl=37 time=24.0 ms
+
+--- google.com ping statistics ---
+9 packets transmitted, 9 received, 0% packet loss, time 8020ms
+rtt min/avg/max/mdev = 20.987/101.044/280.632/84.362 ms
+~
+[3J[H[2J~
+Makefile
+README.md
+a.txt
+dsh
+dsh.cpp
+dsh.h
+fork-examples
+helper.cpp
+history_test.txt
+logs
+output.log
+parse.cpp
+slogs.log
+test.py
+tests.bash
 ~

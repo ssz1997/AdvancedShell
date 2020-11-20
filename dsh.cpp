@@ -50,6 +50,32 @@ bool interactive_shell;
 int calculate(string cmdline);
 bool isArithmetic(string cmdline);
 
+bool free_job(job_t *j);
+
+void remove_finished_jobs() {
+    job_t *job = job_list;
+    job_t *prev_job = NULL;
+    while (job != NULL) {
+        if (job_is_completed(job)) {
+            if (job == job_list) {
+//                if(!free_job(job))
+                job_list = job_list -> next;
+                free_job(job);
+                job = job_list;
+            } else {
+                prev_job -> next = job -> next;
+                free(job);
+                job = prev_job -> next;
+            }
+
+        }
+        else {
+            prev_job = job;
+            job = job -> next;
+        }
+    }
+}
+
 job_t *search_job(int jid)
 {
     job_t *job = job_list;
@@ -70,6 +96,7 @@ job_t *search_job_pos(int pos)
     {
         if (count == 1)
         {
+            printf("job find\n");
             return job;
         }
         if (job->next == NULL)
@@ -213,15 +240,6 @@ int parent_wait(job_t *j, int fg)
             if (WIFEXITED(status))
             {
                 p->completed = true;
-                if (status == EXIT_SUCCESS)
-                {
-                    printf("%d (Completed): %s\n", pid, p->argv[0]);
-                }
-                else
-                {
-                    printf("%d (Failed): %s\n", pid, p->argv[0]);
-                }
-                //fflush(stdout);
             }
             else if (WIFSTOPPED(status))
             {
@@ -257,8 +275,9 @@ int parent_wait(job_t *j, int fg)
 void print_jobs()
 {
     int count = 1;
+    remove_finished_jobs();
     job_t *j = job_list;
-    
+
     if (j == NULL)
     {
         return;
@@ -282,14 +301,14 @@ void print_jobs()
             {
                 printf(" bg ");
                 sprintf(target, " bg  Running        %s\n", j->commandinfo);
-		strcat(log, "~");
+                strcat(log, "~");
                 log_output(log);
             }
             else
             {
                 printf(" fg ");
                 sprintf(target, " fg  Running        %s\n", j->commandinfo);
-		strcat(log, "~");
+                strcat(log, "~");
                 log_output(log);
             }
             printf(" Running        ");
@@ -339,7 +358,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
             log_output(buffer);
             return true;
         }
-        else
+        else if (argc == 2)
         {
             int index = atoi(argv[1]); // unsafe
             FILE *fp = fopen("output.log", "r+");
@@ -361,10 +380,10 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
                 //printf("count: %d, o: %s\n", count, o);
                 count++;
             }
-            printf("Output:\n");
             char *oo = strtok(o, "\n");
-            char output_buffer[1024];
+            char output_buffer[1024] = {0};
             strcat(output_buffer, "Output:\n");
+            printf("%s\n", output_buffer);
             while (oo != NULL)
             {
                 printf("\t%s\n", oo);
@@ -394,21 +413,21 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         return true;
     }
 
-    //Background command, works as long as next argument is a reasonable id
+        //Background command, works as long as next argument is a reasonable id
     else if (!strcmp("bg", argv[0]))
     {
         int position = 0;
         job_t *job;
         if (argc != 2 || !(position = atoi(argv[1])))
         {
-            printf("%d %d", position, argc);
+//            printf("%d %d", position, argc);
             printf("Error: invalid arguments for bg command\n");
             log_output("Error: invalid arguments for bg command\n~");
             return true;
         }
         if (!(job = search_job_pos(position)))
         {
-            printf("%d %d", position, argc);
+//            printf("%d %d", position, argc);
             printf("Error: Could not find requested job\n");
             log_output("Error: Could not find requested job\n~");
             return true;
@@ -430,7 +449,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         return true;
     }
 
-    //Foreground command, works as long as next argument is a reasonable id
+        //Foreground command, works as long as next argument is a reasonable id
     else if (!strcmp("fg", argv[0]))
     {
         int pos = 0;
@@ -440,8 +459,13 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         if (argc == 1)
         {
             job = search_job_pos(-1);
+            if (!job) {
+                printf("Error: No job in job list\n");
+                log_output("Error: No job in job list\n~");
+                return true;
+            }
         }
-        //right arguments given, find respective job
+            //right arguments given, find respective job
         else if (argc == 2 && (pos = atoi(argv[1])))
         {
             if (!(job = search_job_pos(pos)))
@@ -450,7 +474,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
                 log_output("Error: Could not find requested job\n~");
                 return true;
             }
-            if (job->notified == false)
+            if (job->notified)
             {
                 printf("Error: Could not find requested job\n");
                 log_output("Error: Could not find requested job\n~");
@@ -481,7 +505,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
             seize_tty(job->pgid);
 
         int pid = parent_wait(job, true);
-	printf("%d\n", pid);
+        printf("%d\n", pid);
         process_t *p = getProcess(pid);
         if (p->next == NULL && !assigncmd)
         {
@@ -526,7 +550,6 @@ void spawn_job(job_t *j, bool fg)
 {
     pid_t pid;
     process_t *p;
-    job_list = NULL;
     addJob(j);
     int prev_pipe[2];
 
@@ -544,82 +567,82 @@ void spawn_job(job_t *j, bool fg)
         switch (pid = fork())
         {
 
-        case -1: /* fork failure */
-            perror("fork");
-            exit(EXIT_FAILURE);
+            case -1: /* fork failure */
+                perror("fork");
+                exit(EXIT_FAILURE);
 
-        case 0: /* child process  */
-            p->pid = getpid();
+            case 0: /* child process  */
+                p->pid = getpid();
 
-            set_pgid(j, p);
+                set_pgid(j, p);
 
-            if (p != j->first_process)
-            {
-                close(prev_pipe[PIPE_WRITE]);
-                dup2(prev_pipe[PIPE_READ], STDIN_FILENO);
-                close(prev_pipe[PIPE_READ]);
-            }
-            if (p->next)
-            {
-                close(next_pipe[PIPE_READ]);
-                dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
-                close(next_pipe[PIPE_WRITE]);
-            }
-            else
-            {
-                if (assigncmd)
+                if (p != j->first_process)
                 {
-                    int log = open("slogs.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-                    dup2(log, STDOUT_FILENO);
-                    close(log);
+                    close(prev_pipe[PIPE_WRITE]);
+                    dup2(prev_pipe[PIPE_READ], STDIN_FILENO);
+                    close(prev_pipe[PIPE_READ]);
+                }
+                if (p->next)
+                {
+                    close(next_pipe[PIPE_READ]);
+                    dup2(next_pipe[PIPE_WRITE], STDOUT_FILENO);
+                    close(next_pipe[PIPE_WRITE]);
                 }
                 else
                 {
-                    if (p->ofile)
+                    if (assigncmd)
                     {
-                        dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
-                        char log[1024];
-                        snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
-                        log_output(log);
-                    }
-                    else
-                    {
-                        char name[20];
-                        snprintf(name, 20, "logs/%d.log", p->pid);
-                        int log = creat(name, 0644);
-                        dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                        int log = open("slogs.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
                         dup2(log, STDOUT_FILENO);
                         close(log);
                     }
+                    else
+                    {
+                        if (p->ofile)
+                        {
+                            dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                            char log[1024];
+                            snprintf(log, 1024, "Command output is redirected to %s~", p->ofile);
+                            log_output(log);
+                        }
+                        else
+                        {
+                            char name[20];
+                            snprintf(name, 20, "logs/%d.log", p->pid);
+                            int log = creat(name, 0644);
+                            dup2(STDOUT_FILENO, next_pipe[PIPE_WRITE]);
+                            dup2(log, STDOUT_FILENO);
+                            close(log);
+                        }
+                    }
+
+                    close(next_pipe[PIPE_READ]);
+                    close(next_pipe[PIPE_WRITE]);
                 }
 
-                close(next_pipe[PIPE_READ]);
-                close(next_pipe[PIPE_WRITE]);
-            }
+                new_child(j, p, fg);
+                redirect(p);
+                if (execvp(p->argv[0], p->argv) < 0)
+                {
+                    //char buffer[1024];
+                    //snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
+                    //log_output(buffer);
+                    //printf("%s: Command not found.", p->argv[0]);
+                    exit(EXIT_FAILURE);
+                }
 
-            new_child(j, p, fg);
-            redirect(p);
-            if (execvp(p->argv[0], p->argv) < 0)
-            {
-                //char buffer[1024];
-                //snprintf(buffer, sizeof(buffer), "%s: Command not found.\n~", p->argv[0]);
-                //log_output(buffer);
-                //printf("%s: Command not found.", p->argv[0]);
-                exit(EXIT_FAILURE);
-            }
+                perror("New child should have done an exec");
+                exit(EXIT_FAILURE); /* NOT REACHED */
 
-            perror("New child should have done an exec");
-            exit(EXIT_FAILURE); /* NOT REACHED */
+            default: /* parent */
+                /* establish child process group */
+                p->pid = pid;
+                set_pgid(j, p);
 
-        default: /* parent */
-            /* establish child process group */
-            p->pid = pid;
-            set_pgid(j, p);
-
-            /* YOUR CODE HERE?  Parent-side code for new process.  */
-            prev_pipe[PIPE_WRITE] = next_pipe[PIPE_WRITE];
-            prev_pipe[PIPE_READ] = next_pipe[PIPE_READ];
-            break;
+                /* YOUR CODE HERE?  Parent-side code for new process.  */
+                prev_pipe[PIPE_WRITE] = next_pipe[PIPE_WRITE];
+                prev_pipe[PIPE_READ] = next_pipe[PIPE_READ];
+                break;
         }
 
         /* YOUR CODE HERE?  Parent-side code for new job.*/
