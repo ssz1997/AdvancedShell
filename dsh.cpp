@@ -940,6 +940,8 @@ int main()
                 getline(cin, cmdline);
                 if (cmdline.compare("exit") == 0)
                 {
+                    intVariables.clear();
+                    strVariables.clear();
                     break;
                 }
                 else if (isArithmetic(cmdline))
@@ -1036,7 +1038,7 @@ int main()
                             }
                         }
                     }
-
+                    commands.clear();
                     // use for loop to exe every command
                 }
                 else
