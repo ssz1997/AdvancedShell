@@ -258,6 +258,7 @@ void print_jobs()
 {
     int count = 1;
     job_t *j = job_list;
+    
     if (j == NULL)
     {
         return;
@@ -281,12 +282,14 @@ void print_jobs()
             {
                 printf(" bg ");
                 sprintf(target, " bg  Running        %s\n", j->commandinfo);
+		strcat(log, "~");
                 log_output(log);
             }
             else
             {
                 printf(" fg ");
                 sprintf(target, " fg  Running        %s\n", j->commandinfo);
+		strcat(log, "~");
                 log_output(log);
             }
             printf(" Running        ");
