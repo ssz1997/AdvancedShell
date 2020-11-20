@@ -818,7 +818,6 @@ string parse(string cmdline)
             res.push_back(cmdline[i]);
         }
     }
-    cout << "parse result: " << res << endl;
     return res;
 }
 
@@ -964,6 +963,7 @@ int main()
                 getline(cin, cmdline);
                 if (cmdline.compare("exit") == 0)
                 {
+                    strVariables.clear();
                     break;
                 }
                 else if (isArithmetic(cmdline))
@@ -974,7 +974,7 @@ int main()
                     {
                         ans = calculate(cmdline.substr(cmdline.find("=") + 1));
                         string key = cmdline.substr(0, cmdline.find("="));
-                        cout << key << ans << endl;
+                        // cout << key << ans << endl;
                         assignment(key + "=" + to_string(ans));
                     }
                     else
@@ -1060,7 +1060,7 @@ int main()
                             }
                         }
                     }
-
+                    commands.clear();
                     // use for loop to exe every command
                 }
                 else
