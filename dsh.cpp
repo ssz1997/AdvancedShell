@@ -253,12 +253,9 @@ void parent_wait(job_t *j, int fg)
 void print_jobs()
 {
     int count = 1;
-    //    remove_zombies();
     job_t *j = job_list;
     if (j == NULL)
     {
-        //        char *msg = "No jobs are running\n";
-        //        write(STDOUT_FILENO, msg, strlen(msg));
         return;
     }
     while (j != NULL)
