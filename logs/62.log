@@ -1,0 +1,12 @@
+Makefile
+README.md
+dsh
+dsh.cpp
+dsh.h
+fork-examples
+helper.cpp
+logs
+output.log
+parse.cpp
+slogs.log
+tests.bash
