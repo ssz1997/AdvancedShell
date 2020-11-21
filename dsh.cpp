@@ -749,7 +749,7 @@ void assignment(string cmdline)
         }
         else
         {
-            cout << "test" << endl;
+            // cout << "test" << endl;
             strVariables[var] = strVariables.count(value.substr(1)) ? strVariables[value.substr(1)] : "";
         }
     }
