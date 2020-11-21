@@ -1,0 +1,282 @@
+First of all, compile the code with following command:
+	make
+
+Once the compilation succeeds, start devil shell by running:
+	./dsh
+
+Once the $dsh starts running, type "shell" to enter into interactive shell mode with ">>>" appears at front.
+
+If you enter "exit", then the interactive shell would end.
+
+Section 1: Foreground/background management
+
+We would test our foreground/background management:
+
+(1)
+    jobs
+    fg
+    bg
+    fg 1
+    bg 1
+    
+    output:
+    
+    Error: No job in job list
+    Error: invalid arguments for bg command
+    Error: Could not find requested job
+    Error: Could not find requested job
+    
+    The output is correct because at the beginning, there is no jobs.
+    
+    
+(2)
+    ping google.com &
+    jobs
+    fg
+    Ctrl + z
+    jobs
+    
+    output:
+    
+    [1] bg  Running        ping google.com
+    #Bringing job 'ping google.com ' to foreground
+    <outputs of ping commands>
+    [1]    Stopped     ping google.com
+    
+    This is correct as all outputs meet expectation.
+    
+    
+(3)
+    ping google.com &
+    ping youtube.com &
+    jobs
+    
+    [1] bg  Running        ping google.com
+    [2] bg  Running        ping youtube.com
+    
+    This is correct because 2 jobs running in background
+   
+   
+(4)
+    ls &
+    jobs
+    fg
+    
+    [1] bg  Running        ls
+    <output result from ls>
+    
+    This is correct because we do ask user to bring back the job from background to foreground to see the result.
+    
+    
+(5)
+    ping google.com
+    Ctrl + z
+    bg 1
+    jobs
+    
+    <output result from ping>
+    [1]    Stopped     ping google.com
+    #Sending job 'ping google.com' to background
+    [1] bg  Running        ping google.com
+    
+    This is correct because the job is stopped and sent back to run in background.
+    
+    
+(6)
+    ping google.com &
+    ping youtube.com &
+    jobs
+    fg 2
+    ctrl + c
+    fg 1
+    ctrl + c
+    
+    [1] bg  Running        ping google.com
+    [2] bg  Running        ping youtube.com
+    #Sending job 'ping youtube.com' to foreground
+    <output of ping youtube>
+    #Sending job 'ping google.com' to foreground
+    <output of ping google>
+    
+    This is correct because when we bring jobs from background to foreground, we have to use correct job ID.
+
+Seciton 2: Interactive Shell
+
+We would test our interactive shell, and we are going to divide testing into following sections:
+	1. Built-in function testing:
+	   This section would focus on testing all the built-in functions, and see if the basic Unix functions work.
+
+	2. Variable Declaration:
+	   This section	includes declare a variable to an integer , string, or a Unix bash command.
+
+	3. Arithmetic Operation:
+	   This section tests the function of performing addition and subtraction functions as well as assigning the variable to their operation's results
+
+	4. For loop:
+	   This section tests the function of performing using for loop finish the previous 3 tasks in repetative way.
+
+Section 1: Built-in Function Testing
+	(1) ls
+
+	    You will see the files in the working directory are listed below in the terminal
+
+	(2) pwd
+
+		You will see the current directory' location
+
+Section 2: Variable Declaration
+	(1) a=1  echo $a
+
+		You will see that 1 is being printed out by using echo $a, which reference that its print the variable.
+
+	(2) a=($pwd) echo $a
+
+		You will see that the output/execution result of pwd is being printed --> /your_path/AdvancedShell
+
+	(3) a=1 b=$a echo $b
+
+		You will assign b as the value of a, so echo $b will output 1 as well
+
+Section 3: Arithmetic Operation
+	(1) addition and subtraction
+
+		You can perform addition and subtraction directly on the shell, and the result would appear
+		e.g 1+2 --> 3, 1-2 --> -1
+
+	(2) operation with bracket
+
+		You can perform complex operations in addition and subtraction
+		e.g (7-3)-(1-9) --> 12, ((7+2)-3+(4-9)) --> 1
+
+	(3) arithmetic operation with declaration
+
+		You can perform operations using variables as well.
+		e.g a=1, b=2, $a + $b --> 3
+
+	(4) assign value using operation
+
+		You can assign a variable's value as the operation.
+		e.g a=1+2, echo $a --> 3
+
+	(5) assign value using operation and variable
+
+		You can do addition and subtraction using variable.
+		e.g a=1  b=2  t=$a+$b   echo $t --> 3, mean t has been assign as a+b == 1+2.
+
+
+Section 4: For loop
+	For loop can accomplish the all the normal tasks above such as assignments and normal operation in repetative way
+
+	(1) for i in {1..4}
+		do
+			echo 1
+		done
+
+		We will see 1 is being output for 4 times.
+
+	(2) increament the variable multiple time 
+		By doing 
+		a=1
+		for i in {1..4}
+		do
+			a=$a+1
+		done
+
+		We will see 2, 3, 4, 5 has been printed out as the value of a, so we can do recursive addition here
+
+	(3) outputing the index of the loop with different step size. 
+		By doing:
+		for i in {1..6..2}
+		do
+			echo $i
+		done
+
+		We will see 1, 3, 5 are being printed out because we use step 2 here.
+
+	(4) outputing the output of pwd 4 times 
+		By doing:
+		for i in {1..4}
+		do
+			pwd
+		done
+
+		We will see /your_path/AdvancedShell 4 times
+
+Section 3: History
+We would test our history function, and we are going to divide testing into following sections:
+
+“history” command prints out previous commands
+“history i” command prints out the output of the command of index i.
+
+(1) 
+    pwd
+    history
+    history
+
+    You will see the following output:
+
+    *current path*
+
+    1: pwd
+
+    1: pwd
+    2: history
+
+    This is correct because the history command should print out previous commands. Here the first history should print the first command, and the second history should print the first command plus the second command, which is a history
+
+
+(2)
+    pwd
+    history 1
+
+    You will see the following output:
+
+    /cps510/compsci310-fall20/AdvancedShell
+
+    Output: 
+	    
+	    *current path*
+
+    This is correct because history index should print the output of that command with the specified index, in this case, the current path.
+
+
+(3) pwd > a.txt
+    history 1
+
+    You will see the following output:
+
+    Output: 
+	    
+	    Command output is redirected to a.txt
+
+    This is correct because when the job has io redirection, we don't need to go to that file and put the output into our record.
+
+
+(4) ping google.com &
+    history 1
+
+    You will see the following output:
+
+    Output:
+
+	Note: the output is written in logs/27.log
+
+    This is correct because we are storing the output of a background job in a file, whose path is logs/pid.log
+
+
+(5) ping google.com &
+    fg 1
+    ctrl-z
+    history 2
+
+    You will see the following output:
+
+    * a bunch of ping outputs *
+    
+    Output:
+	    #Sending job 'ping google.com ' to foreground
+
+
+    This is correct because this is exactly what the output of fg.
+
+
