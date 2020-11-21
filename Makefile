@@ -27,4 +27,4 @@ dsh: dsh.cpp parse.cpp helper.cpp dsh.h
 #dsh: dsh.c dsh.h
 #	$(CC) $(CFLAGS) -o dsh dsh.c
 clean:
-	rm -f ${EXECUTABLES} *.o *~
+	rm -f ${EXECUTABLES} *.o 

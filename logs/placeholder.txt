@@ -1,1 +1,1 @@
-This is just a place holder.
+This is just to make sure the logs folder exists
