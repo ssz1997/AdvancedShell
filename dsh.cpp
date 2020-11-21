@@ -417,6 +417,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         //Background command, works as long as next argument is a reasonable id
     else if (!strcmp("bg", argv[0]))
     {
+        remove_finished_jobs();
         int position = 0;
         job_t *job;
         if (argc != 2 || !(position = atoi(argv[1])))
@@ -453,6 +454,7 @@ bool builtin_cmd(job_t *last_job, int argc, char **argv)
         //Foreground command, works as long as next argument is a reasonable id
     else if (!strcmp("fg", argv[0]))
     {
+        remove_finished_jobs();
         int pos = 0;
         job_t *job;
 
